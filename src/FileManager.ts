@@ -1,6 +1,5 @@
 import path from 'path';
 import fs from 'fs';
-import { dir } from 'console';
 
 type BaseFSItem = {
     name: string,
@@ -20,30 +19,56 @@ export type DirectoryInfo = BaseFSItem & {
 
 export type FSItem = FileInfo | DirectoryInfo;
 
-export interface IFileCrawler {
+export interface IFileManager {
     /**
-     * 
+     * @description Get a list of files and folders in a provided directory.
+     * @param directory string The directory who contents we want to enumerate.
+     * @param maxRecursiveDepth number? If 0 or less no recursion is used. Otherwise the function will recurse up to the value provided times.
      */
     enumerateDirectory: (directory: string, maxRecursiveDepth?: number) => FSItem[]
+    /**
+     * @description Will create a directory (recursivly if necessary).
+     * @param targetDir string The path to create a directory.
+     * @returns boolean value. if true then the directory was created or already existed.
+     */
+    makeDir: (targetDir: string) => boolean
 }
 
 class ErrorDirectoryDoesNotExist extends Error {
-    static ErrorName: string = "DirectoryDoesNotExist";
+    static ErrorName = "DirectoryDoesNotExist";
     constructor(directory: string) {
         super(`directory does not exist: ${directory}`)
     }
 }
 
 class ErrorIsNotDirectory extends Error {
-    static ErrorName: string = "IsNotDirectory";
+    static ErrorName = "IsNotDirectory";
     constructor(item: string) {
-        super(`item is not a directory: ${item}`)
+        super(`item exists and is not a directory: ${item}`)
     }
 }
 
-export class FileCrawler implements IFileCrawler {
+export class FileManager implements IFileManager {
 
-    public enumerateDirectory(directory: string, maxRecursiveDepth: number = 0): FSItem[] {
+    public makeDir(targetDir: string): boolean {
+        let success = false;
+        const alreadyExists = fs.existsSync(targetDir);
+        if (!alreadyExists) {
+            fs.mkdirSync(targetDir, {
+                recursive: true,
+            });
+            success = true;
+        } else {
+            const existingStats = fs.lstatSync(targetDir);
+            if (!existingStats.isDirectory()) {
+                throw new ErrorIsNotDirectory(targetDir);
+            }
+            success = true;
+        }
+        return success;
+    }
+
+    public enumerateDirectory(directory: string, maxRecursiveDepth = 0): FSItem[] {
         // does it exist
         const exists = fs.existsSync(directory);
         if (!exists) {
@@ -58,11 +83,12 @@ export class FileCrawler implements IFileCrawler {
         const contents = fs.readdirSync(directory);
         // if recursive loop over stuff and go in directories
         for (const item of contents) {
-            const fsItem = this.getFSItemFromPath(item);
+            const itemPath: string = path.join(itemInfo.fullPath, item)
+            const fsItem = this.getFSItemFromPath(itemPath);
             // This feels weird, but my thought is if you pass -1 or somthing then go recursive all the way?
             if (maxRecursiveDepth != 0) {
                 if (fsItem.type === 'directory') {
-                     const subContents = this.enumerateDirectory(item, maxRecursiveDepth-1);
+                     const subContents = this.enumerateDirectory(itemPath, maxRecursiveDepth-1);
                      fsItem.files = subContents;
                 }
             }
