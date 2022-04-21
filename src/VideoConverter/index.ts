@@ -1,4 +1,4 @@
 export const COPY_ENCODING = "copy";
 
 export * from './models';
-export * from './FFMPEGVideoConverter';
+export * from './FFMPEG/FFMPEGVideoConverter';

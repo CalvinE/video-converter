@@ -1,5 +1,5 @@
-import { FileInfo } from "../FileManager";
-import { CommandRunner } from "./CommandRunner";
+import { FileInfo } from "../../FileManager";
+import { CommandRunner } from "../CommandRunner";
 import {
     ConvertVideoCodecOptions,
     ConvertVideoContainerOptions,
@@ -18,7 +18,7 @@ import {
     VideoConverterEventName_Timedout,
     ConvertVideoCodecResult,
     ConvertVideoContainerResult,
-} from "./models";
+} from "../models";
 
 
 export class FFMPEGVideoConverter extends CommandRunner implements IVideoConverter {
