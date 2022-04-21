@@ -17,6 +17,15 @@ describe('FileManager tests', () => {
             const dirContents = fileCrawler.enumerateDirectory(testFolderPath)
             assert.equal(dirContents.length, 2)
         });
+        it('Should populate file extension on FIleInfo.', () => {
+            const dirContents = fileCrawler.enumerateDirectory(testFolderPath)
+            assert.equal(dirContents.length, 2)
+            if (dirContents[1].type === 'file') {
+                assert.equal(dirContents[1].extension, ".txt");
+            } else {
+                assert.isTrue(false, "first item in dirContents should be a file with a .txt extension")
+            }
+        });
         it('Should enumerate a directory recursivly when max recursion level is 1 or greater', () => {
             const dirContents = fileCrawler.enumerateDirectory(testFolderPath, 99)            
             assert.equal(dirContents.length, 2)

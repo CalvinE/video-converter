@@ -10,6 +10,7 @@ type BaseFSItem = {
 export type FileInfo = BaseFSItem & {
     type: "file";
     size: number;
+    extension: string;
 }
 
 export type DirectoryInfo = BaseFSItem & {
@@ -111,6 +112,7 @@ export class FileManager implements IFileManager {
                 ...baseFSInfo,
                 type: 'file',
                 size: stats.size,
+                extension: path.extname(itemPath).toLowerCase(),
             }
         }
     }
