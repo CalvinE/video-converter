@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "mocha --recursive -r ts-node/register --timeout 999999999 --exit ./test/**/*.test.ts",
+    "test": "mocha --recursive -r ts-node/register --timeout 999999999 --exit ./src/test/**/*.test.ts",
     "build": "tsc",
     "build:watch": "tsc -w"
   },

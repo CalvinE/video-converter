@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { FileManager, IFileManager } from '../src/FileManager';
+import { FileManager, IFileManager } from '../FileManager';
 import { assert } from 'chai';
 import { rmSync } from 'fs';
 
