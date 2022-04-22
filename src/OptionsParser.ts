@@ -11,7 +11,7 @@ export type AppOptions = {
 
 export function ParseOptions(): Partial<AppOptions> {
     const options: Partial<AppOptions> = {};
-    for (let i = 0; i < argv.length; i++) {
+    for (let i = 2; i < argv.length; i++) {
         const currentArg = argv[i].substring(2);
         switch (currentArg) {
             case HELP_OPTION_NAME:

@@ -30,5 +30,16 @@
 				"<node_internals>/**"
 			]
 		},
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "First Test",
+			"program": "${workspaceFolder}/build/index.js",
+			"args": [
+				"--sourcePath",
+				"."
+			],
+			"protocol": "inspector",
+		},
     ]
 }

@@ -1,3 +1,4 @@
+import { ILogger } from './../../Logger/Logger';
 import { FileInfo } from "../../FileManager";
 import { CommandRunner } from "../CommandRunner";
 import {
@@ -22,12 +23,18 @@ import {
 
 
 export class FFMPEGVideoConverter extends CommandRunner implements IVideoConverter {
-    private _ffmpegCommand: string;
 
-    constructor(ffmpegCommand: string) {
-        super();
-        // TODO: test to see if command worked?
-        this._ffmpegCommand = ffmpegCommand ?? "ffmpeg";
+    constructor(ffmpegCommand: string, logger: ILogger) {
+        super(ffmpegCommand, logger);
+        this._logger = logger;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    public override async checkCommand(_: string[]): Promise<boolean> {
+        this._logger.LogDebug("checking to see if command can be run.", {command: this._command})
+        const result = await this.executeCommand(["-h"], "test", 10000000);
+        this._logger.LogDebug("finished check of command", result);
+        return result?.success === true
     }
 
     protected override emitStarted(data: CommandStartedEventData) {
@@ -57,7 +64,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
 
     public async ConvertVideoCodec(sourceFile: FileInfo, options: ConvertVideoCodecOptions): Promise<ConvertVideoCodecResult> {
         // TODO: craft the ffmpeg command.
-        const commandResult = await this.executeCommand(this._ffmpegCommand, [], "test1", 0);
+        const commandResult = await this.executeCommand([], "test1", 0);
         // TODO: compute pre and post size, stuff like that?
         return {
             duration: commandResult.durationMilliseconds,
@@ -67,7 +74,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
 
     public async ConvertVideoContainer(sourceFile: FileInfo, options: ConvertVideoContainerOptions): Promise<ConvertVideoContainerResult> {
         // TODO: craft the ffmpeg command.
-        const commandResult = await this.executeCommand(this._ffmpegCommand, [], "test2", 0);
+        const commandResult = await this.executeCommand([], "test2", 0);
         // TODO: compute pre and post size, stuff like that?
         return {
             duration: commandResult.durationMilliseconds,

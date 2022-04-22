@@ -1,7 +1,9 @@
+import { FileLogger } from './Logger/FileLogger';
+import { FFMPEGVideoConverter } from './VideoConverter';
 import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
 
 
-(function() {
+(async function() {
     const appOptions: Partial<AppOptions> = ParseOptions();
     if (appOptions.help === true) {
         // print help and return...
@@ -9,4 +11,10 @@ import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
         return;
     }
     // run the app?
+    const logger = new FileLogger("verbose", "./logs", true);
+    logger.LogDebug("This is a test", {})
+    const runner = new FFMPEGVideoConverter("ffmpeg", logger);
+    const result = await runner.checkCommand([]);    
+    console.dir(JSON.stringify(result));
+    await logger.shutdown();
 })()

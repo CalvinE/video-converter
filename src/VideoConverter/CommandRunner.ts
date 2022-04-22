@@ -1,5 +1,7 @@
 import { spawn } from 'child_process';
 import { EventEmitter } from 'stream';
+import { setTimeout } from 'timers';
+import { ILogger } from '../Logger/Logger';
 import { CommandErroredEventData, CommandStateName_Errored, CommandFinishedEventData, CommandStateName_Finished, CommandMessageReceivedEventData, CommandStateName_Pending, CommandRunningEventData, CommandStateName_Running, CommandStartedEventData, CommandStateName_Started, CommandState, CommandTimedoutEventData, CommandStateName_TimedOut } from './models';
 
 export type CommandResult = {
@@ -18,13 +20,31 @@ class ErrorCommandTimeOutExceeded extends Error {
     }
 }
 
+class ErrorCommandNotProvided extends Error {
+    static ErrorName = "CommandNotProvided";
+    constructor() {
+        super("no command was procided for CommandRunner constructor");
+    }
+}
+
 export abstract class CommandRunner extends EventEmitter {
     public currentState: CommandState;
 
-    constructor() {
+    protected _command: string;
+
+    protected _logger: ILogger;
+
+    constructor(command: string, logger: ILogger) {
         super();
+        if (!command) {
+            throw new ErrorCommandNotProvided();
+        }
+        this._command = command;
+        this._logger = logger;
         this.currentState = CommandStateName_Pending;
     }
+
+    public abstract checkCommand(args: string[]): Promise<boolean>;
 
     protected abstract emitStarted(data: CommandStartedEventData): void;
     protected abstract emitRunning(data: CommandRunningEventData): void;
@@ -33,12 +53,13 @@ export abstract class CommandRunner extends EventEmitter {
     protected abstract emitErrored(data: CommandErroredEventData): void;
     protected abstract emitTimedout(data: CommandTimedoutEventData): void;
 
-    protected async executeCommand(command: string, args: string[], commandId: string, timeoutMilliseconds: number): Promise<CommandResult> {
+    protected async executeCommand(args: string[], commandId: string, timeoutMilliseconds: number): Promise<CommandResult> {
+        
         let timeoutTimer: NodeJS.Timeout;
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const commandOutput: string[] = [];
             const startTimestampMilliseconds = Date.now();
-            const proc = spawn(command, args, {
+            const proc = spawn(this._command, args, {
 
             });
             this.currentState = CommandStateName_Started;
@@ -60,7 +81,7 @@ export abstract class CommandRunner extends EventEmitter {
                 });
             });
 
-            proc.on('message', (message, handle) => {
+            proc.on('message', (message) => {
                 // Output from command has been received: https://nodejs.org/api/child_process.html#event-message
                 const currentMessage = message.toString();
                 commandOutput.push(currentMessage);
@@ -94,7 +115,7 @@ export abstract class CommandRunner extends EventEmitter {
                 });
             });
 
-            proc.on('close', (code, signal) => {
+            proc.on('close', (code) => {
                 // The process has ended and the stdio streams of the child process have been closed: https://nodejs.org/api/child_process.html#event-close
                 if (this.currentState === "running") {
                     const durationMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
@@ -118,7 +139,7 @@ export abstract class CommandRunner extends EventEmitter {
                 }
             });
 
-            proc.on('exit', (code, signal) => {
+            proc.on('exit', (code) => {
                 // The child process has ended: https://nodejs.org/api/child_process.html#event-exit
                 if (this.currentState === "running") {
                     const durationMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
@@ -161,9 +182,9 @@ export abstract class CommandRunner extends EventEmitter {
             if (timeoutMilliseconds > 0) {
                 timeoutTimer = setTimeout(() => {
                     clearTimeout(timeoutTimer);
-                    proc.kill("SIGKILL"); // Is this ok?
                     // emit timedout event 
                     if (this.currentState === "running") {
+                        proc.kill("SIGKILL"); // Is this ok?
                         const durationMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
                         this.currentState = CommandStateName_TimedOut;
                         this.emitTimedout({
