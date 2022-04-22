@@ -15,6 +15,6 @@ import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
     logger.LogDebug("This is a test", {})
     const runner = new FFMPEGVideoConverter("ffmpeg", logger);
     const result = await runner.checkCommand([]);    
-    console.dir(JSON.stringify(result));
+    logger.LogDebug("finshed!", {result});
     await logger.shutdown();
 })()
