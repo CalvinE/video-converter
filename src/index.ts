@@ -3,7 +3,7 @@ import { FFMPEGVideoConverter } from './VideoConverter';
 import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
 
 
-(async function() {
+async function run() {
     const appOptions: Partial<AppOptions> = ParseOptions();
     if (appOptions.help === true) {
         // print help and return...
@@ -17,4 +17,8 @@ import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
     const result = await runner.checkCommand([]);    
     logger.LogDebug("finshed!", {result});
     await logger.shutdown();
-})()
+}
+
+run().then(() => {
+    process.exit();
+});
