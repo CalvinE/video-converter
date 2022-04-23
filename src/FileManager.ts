@@ -1,10 +1,12 @@
+import { ILogger } from './Logger/Logger';
 import path from 'path';
 import fs from 'fs';
 
 type BaseFSItem = {
-    name: string,
-    pathToItem: string,
     fullPath: string;
+    name: string;
+    pathToItem: string;
+    relativepath: string;
 }
 
 export type FileInfo = BaseFSItem & {
@@ -50,11 +52,17 @@ class ErrorIsNotDirectory extends Error {
 }
 
 export class FileManager implements IFileManager {
+    private _logger: ILogger;
+
+    constructor(logger: ILogger) {
+        this._logger = logger;
+    }
 
     public makeDir(targetDir: string): boolean {
         let success = false;
         const alreadyExists = fs.existsSync(targetDir);
         if (!alreadyExists) {
+            this._logger.LogVerbose("directory did not already exist, so we are creating it", {targetDir});
             fs.mkdirSync(targetDir, {
                 recursive: true,
             });
@@ -62,7 +70,9 @@ export class FileManager implements IFileManager {
         } else {
             const existingStats = fs.lstatSync(targetDir);
             if (!existingStats.isDirectory()) {
-                throw new ErrorIsNotDirectory(targetDir);
+                const err =  new ErrorIsNotDirectory(targetDir);
+                this._logger.LogError("targetDir provided is not a directory...", err, {targetDir})
+                throw err;
             }
             success = true;
         }
@@ -71,26 +81,35 @@ export class FileManager implements IFileManager {
 
     public enumerateDirectory(directory: string, maxRecursiveDepth = 0): FSItem[] {
         // does it exist
+        this._logger.LogDebug("attempting to enumerate directory", {directory, maxRecursiveDepth});
         const exists = fs.existsSync(directory);
         if (!exists) {
-            throw new ErrorDirectoryDoesNotExist(directory);
+            const err = new ErrorDirectoryDoesNotExist(directory);
+            this._logger.LogError("directory does not exist", err, {directory});
+            throw err;
         }
         const itemInfo: FSItem = this.getFSItemFromPath(directory);
         // is it a directory
         if (itemInfo.type !== 'directory') {
-            throw new ErrorIsNotDirectory(directory);
+            const err = new ErrorIsNotDirectory(directory);
+            this._logger.LogError("directory to enumerate is not a directory", err, {directory});
+            throw err;
         }
         // get directory contents
         const contents = fs.readdirSync(directory);
+        this._logger.LogDebug("found contents of directory", {directory, numItems: contents.length, maxRecursiveDepth});
         // if recursive loop over stuff and go in directories
         for (const item of contents) {
             const itemPath: string = path.join(itemInfo.fullPath, item)
+            this._logger.LogVerbose("getting info on specific item", {file: item});
             const fsItem = this.getFSItemFromPath(itemPath);
+            this._logger.LogVerbose("file info aquired", {fsItem})
             // This feels weird, but my thought is if you pass -1 or somthing then go recursive all the way?
             if (maxRecursiveDepth != 0) {
                 if (fsItem.type === 'directory') {
-                     const subContents = this.enumerateDirectory(itemPath, maxRecursiveDepth-1);
-                     fsItem.files = subContents;
+                    this._logger.LogVerbose("recursing into directory", {fsItem, maxRecursiveDepth});
+                    const subContents = this.enumerateDirectory(itemPath, maxRecursiveDepth-1);
+                    fsItem.files = subContents;
                 }
             }
             itemInfo.files.push(fsItem);
@@ -119,9 +138,10 @@ export class FileManager implements IFileManager {
 
     private getBaseFSInfoFromPath(itemPath: string): BaseFSItem {
         const baseFSItem: BaseFSItem = {
+            fullPath: path.resolve(itemPath),
             name: path.basename(itemPath),
             pathToItem: path.dirname(itemPath),
-            fullPath: path.resolve(itemPath),
+            relativepath: path.dirname(path.relative(".", itemPath)),
         }
         return baseFSItem;
     }

@@ -15,9 +15,9 @@ async function run() {
     const logger = new FileLogger("verbose", "./logs", true);
     // const logger = new PrettyJSONConsoleLogger("verbose");
     logger.LogDebug("This is a test", {})
-    const ffmpegVideoConverter = new FFMPEGVideoConverter("ffmpeg", "ffprobe", logger);
+    const fileManager = new FileManager(logger);
+    const ffmpegVideoConverter = new FFMPEGVideoConverter("ffmpeg", "ffprobe", logger, fileManager);
     const result = await ffmpegVideoConverter.checkCommand([]);
-    const fileManager = new FileManager();
     const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath!, 10);
     for (const item of sourcePathContents) {
         if (item.type === 'file') {

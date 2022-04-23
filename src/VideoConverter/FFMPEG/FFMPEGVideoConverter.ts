@@ -1,11 +1,11 @@
-import { VideoInfo } from './../models';
+import { IFileManager } from './../../FileManager';
+import { VideoInfo, COPY } from './../models';
 import { randomUUID } from 'crypto';
 import { ILogger } from './../../Logger/Logger';
 import { FileInfo } from "../../FileManager";
 import { CommandRunner } from "../CommandRunner";
 import {
-    ConvertVideoCodecOptions,
-    ConvertVideoContainerOptions,
+    VideoConvertOptions,
     IVideoConverter,
     CommandStartedEventData,
     CommandRunningEventData,
@@ -19,18 +19,20 @@ import {
     VideoConverterEventName_Finished,
     VideoConverterEventName_Errored,
     VideoConverterEventName_Timedout,
-    ConvertVideoCodecResult,
-    ConvertVideoContainerResult,
+    VideoConvertResult,
 } from "../models";
+import { join } from 'path';
 
 export class FFMPEGVideoConverter extends CommandRunner implements IVideoConverter {
 
     private _ffmpegCommand: string
     private _ffprobeCommand: string
+    private _fileManager: IFileManager;
 
-    constructor(ffmpegCommand: string, ffprobeCommand: string, logger: ILogger) {
+    constructor(ffmpegCommand: string, ffprobeCommand: string, logger: ILogger, fileManager: IFileManager) {
         super(logger);
         this._logger = logger;
+        this._fileManager = fileManager;
         this._ffmpegCommand = ffmpegCommand ?? "ffmpeg";
         this._ffprobeCommand = ffprobeCommand ?? "ffprobe";
     }
@@ -83,29 +85,41 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         const commandResults = await this.executeCommand(this._ffprobeCommand, args, `GetVideoInfo-${randomUUID()}`, 0)
         const joinedCommandOutput = commandResults.fullOutput.join("");
         const videoInfo: VideoInfo = JSON.parse(joinedCommandOutput);
-        this._logger.LogVerbose("video info retreived", {videoInfo})
+        this._logger.LogVerbose("video info retreived", { videoInfo })
         return videoInfo;
     }
 
     // TODO: add command timeout parameter
-    public async ConvertVideoCodec(sourceFile: FileInfo, options: ConvertVideoCodecOptions): Promise<ConvertVideoCodecResult> {
-        // TODO: craft the ffmpeg command.
+    public async ConvertVideo(sourceFile: FileInfo, options: VideoConvertOptions): Promise<VideoConvertResult> {
+        // TODO: craft the ffmpeg command.")
+        this._logger.LogDebug("attempting to convert a video", { sourceFile, options });
+        this._fileManager.makeDir(options.savePath);
+        const targetFilePath = join(options.savePath,)
         const commandResult = await this.executeCommand(this._ffmpegCommand, [], `ConvertVideoCodec-${randomUUID()}`, 0);
         // TODO: compute pre and post size, stuff like that?
         return {
             duration: commandResult.durationMilliseconds,
-            success: commandResult.success
+            success: commandResult.success,
+
         }
     }
 
-    // TODO: add command timeout parameter
-    public async ConvertVideoContainer(sourceFile: FileInfo, options: ConvertVideoContainerOptions): Promise<ConvertVideoContainerResult> {
-        // TODO: craft the ffmpeg command.
-        const commandResult = await this.executeCommand(this._ffmpegCommand, [], `ConvertVideoContainer-${randomUUID()}`, 0);
-        // TODO: compute pre and post size, stuff like that?
-        return {
-            duration: commandResult.durationMilliseconds,
-            success: commandResult.success
+    private getTargetFileFullPath(sourceFile: FileInfo, options: VideoConvertOptions): string {
+        let targetFileName = options.targetFileName;
+        if (targetFileName === "") {
+            let containerFormat = sourceFile.extension.toLowerCase();
+            const targetContainerFormat = options.targetContainerFormat.toLocaleLowerCase();
+            if (targetContainerFormat &&
+                targetContainerFormat !== COPY &&
+                containerFormat !== targetContainerFormat) {
+                containerFormat = targetContainerFormat;
+            }
+            let fileNameWithoutExtension = sourceFile.name.substring(0, sourceFile.name.lastIndexOf(".") - 1);
+            if (options.targetFileName !== "") {
+
+            }
         }
+        const fullTargetPath = join(options.savePath, targetFileName)
+        return fullTargetPath;
     }
 }

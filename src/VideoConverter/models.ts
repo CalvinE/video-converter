@@ -1,15 +1,19 @@
 import { FileInfo } from "../FileManager";
 
+/**
+ * @description This options is valid for video container format, audio codec, and video codec. When set it uses the value of the source file.
+ * 
+ */
+export const COPY = "copy";
 export const VideoContainerFormat_MP4 = "mp4";
 export const VideoContainerFormat_MOV = "mov";
 export const VideoContainerFormat_AVI = "avi";
 
-export type VideoContainer = `${typeof VideoContainerFormat_MP4 | typeof VideoContainerFormat_MOV | typeof VideoContainerFormat_AVI}`;
+export type VideoContainerFormat = `${typeof VideoContainerFormat_MP4 | typeof VideoContainerFormat_MOV | typeof VideoContainerFormat_AVI | typeof COPY}`;
 
+export type VideoEncoding = `${typeof COPY}`;
 
-
-export type VideoEncoding = "";
-export type AudioEncoding = "";
+export type AudioEncoding = `${typeof COPY}`;
 
 export const VideoConverterEventName_Started = "starting"
 export const VideoConverterEventName_Running = "running"
@@ -33,12 +37,15 @@ export type CommandState = `${typeof CommandStateName_Pending | typeof CommandSt
 type BaseVideoConverterOptions = {
     commmandID: string;
     savePath: string;
-    targetContainer?: VideoContainer;
+    targetFileName: string;
 };
 
 type BaseVideoConverterResult = {
     success: boolean;
     duration: number;
+    sourceFileFullPath: string;
+    targetFileFullpath: string;
+    sizeDifference: number;
 }
 
 type BaseVideoConverterEvent = {
@@ -70,21 +77,17 @@ export type CommandTimedoutEventData = BaseVideoConverterEvent & {
     timeoutMilliseconds: number;
 };
 
-export type ConvertVideoCodecOptions = BaseVideoConverterOptions & {
-    targetVideoEncoding?: VideoEncoding;
-    targetAudioEncoding?: AudioEncoding;
+export type VideoConvertOptions = BaseVideoConverterOptions & {
+    targetVideoEncoding: VideoEncoding;
+    targetAudioEncoding: AudioEncoding;
+    targetContainerFormat: VideoContainerFormat;
 };
 
-export type ConvertVideoCodecResult = BaseVideoConverterResult;
-
-export type ConvertVideoContainerOptions = BaseVideoConverterOptions;
-
-export type ConvertVideoContainerResult = BaseVideoConverterResult;
+export type VideoConvertResult = BaseVideoConverterResult;
 
 export interface IVideoConverter {
     GetVideoInfo: (sourceFile: FileInfo) => Promise<VideoInfo>;
-    ConvertVideoCodec: (sourceFile: FileInfo, options: ConvertVideoCodecOptions) => Promise<ConvertVideoCodecResult>;
-    ConvertVideoContainer: (sourceFile: FileInfo, options: ConvertVideoContainerOptions) => Promise<ConvertVideoContainerResult>;
+    ConvertVideo: (sourceFile: FileInfo, options: VideoConvertOptions) => Promise<VideoConvertResult>;
 }
 
 export type VideoInfo = {
