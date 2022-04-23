@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import { EventEmitter } from 'stream';
 import { setTimeout } from 'timers';
 import { ILogger } from '../Logger/Logger';
-import { CommandErroredEventData, CommandStateName_Errored, CommandFinishedEventData, CommandStateName_Finished, CommandMessageReceivedEventData, CommandStateName_Pending, CommandRunningEventData, CommandStateName_Running, CommandStartedEventData, CommandStateName_Started, CommandState, CommandTimedoutEventData, CommandStateName_TimedOut } from './models';
+import { CommandErroredEventData, CommandStateName_Errored, CommandFinishedEventData, CommandStateName_Finished, CommandMessageReceivedEventData, CommandRunningEventData, CommandStateName_Running, CommandStartedEventData, CommandStateName_Started, CommandState, CommandTimedoutEventData, CommandStateName_TimedOut } from './models';
 
 export type CommandResult = {
     commandId: string,
@@ -20,28 +20,20 @@ class ErrorCommandTimeOutExceeded extends Error {
     }
 }
 
-class ErrorCommandNotProvided extends Error {
-    static ErrorName = "CommandNotProvided";
-    constructor() {
-        super("no command was procided for CommandRunner constructor");
-    }
-}
+// class ErrorCommandNotProvided extends Error {
+//     static ErrorName = "CommandNotProvided";
+//     constructor() {
+//         super("no command was procided for CommandRunner constructor");
+//     }
+// }
 
 export abstract class CommandRunner extends EventEmitter {
-    public currentState: CommandState;
-
-    protected _command: string;
 
     protected _logger: ILogger;
 
-    constructor(command: string, logger: ILogger) {
+    constructor(logger: ILogger) {
         super();
-        if (!command) {
-            throw new ErrorCommandNotProvided();
-        }
-        this._command = command;
         this._logger = logger;
-        this.currentState = CommandStateName_Pending;
     }
 
     public abstract checkCommand(args: string[]): Promise<boolean>;
@@ -53,59 +45,85 @@ export abstract class CommandRunner extends EventEmitter {
     protected abstract emitErrored(data: CommandErroredEventData): void;
     protected abstract emitTimedout(data: CommandTimedoutEventData): void;
 
-    protected async executeCommand(args: string[], commandId: string, timeoutMilliseconds: number): Promise<CommandResult> {
-        
-        let timeoutTimer: NodeJS.Timeout;
+    protected async executeCommand(command: string, args: string[], commandId: string, timeoutMilliseconds: number): Promise<CommandResult> {
         return new Promise((resolve) => {
+            let currentState: CommandState;
+            let timeoutTimer: NodeJS.Timeout;
             const commandOutput: string[] = [];
             const startTimestampMilliseconds = Date.now();
-            const proc = spawn(this._command, args, {
-
+            this._logger.LogVerbose("about to run command", {
+                command: command,
+                commandId: commandId,
+                args,
+            })
+            const proc = spawn(command, args, {
+                shell: true,
             });
-            this.currentState = CommandStateName_Started;
-            this.emitStarted({
+            currentState = CommandStateName_Started;
+            const eventData = {
                 commandId,
-                currentState: this.currentState,
+                currentState,
                 elapsedTimeMilliseconds: this.getElapsedTimeMillseconds(startTimestampMilliseconds),
                 pid: proc.pid,
-            });
+            };
+            this._logger.LogDebug("starting command", eventData)
+            this.emitStarted(eventData);
 
             proc.on('spawn', () => {
                 // The process has started: https://nodejs.org/api/child_process.html#event-spawn
-                this.currentState = CommandStateName_Running;
-                this.emitRunning({
+                currentState = CommandStateName_Running;
+                const eventData = {
                     commandId,
-                    currentState: this.currentState,
+                    currentState,
                     elapsedTimeMilliseconds: this.getElapsedTimeMillseconds(startTimestampMilliseconds),
                     pid: proc.pid,
-                });
+                };
+                this._logger.LogDebug("command process spawned", eventData)
+                this.emitRunning(eventData);
             });
-
-            proc.on('message', (message) => {
-                // Output from command has been received: https://nodejs.org/api/child_process.html#event-message
-                const currentMessage = message.toString();
+            
+            proc.stdout.on("data", (chunk) => {
+                const currentMessage = chunk.toString();
                 commandOutput.push(currentMessage);
-                this.emitMessageReceived({
+                const eventData = {
                     commandId,
-                    currentState: this.currentState,
+                    currentState,
                     elapsedTimeMilliseconds: this.getElapsedTimeMillseconds(startTimestampMilliseconds),
                     message: currentMessage,
                     pid: proc.pid,
-                });
+                };
+                this._logger.LogDebug("message received from command stdout", eventData)
+                this.emitMessageReceived(eventData);
             });
+
+            // proc.on('message', (message) => {
+            //     // Output from command has been received: https://nodejs.org/api/child_process.html#event-message
+            //     const currentMessage = message.toString();
+            //     commandOutput.push(currentMessage);
+            //     const eventData = {
+            //         commandId,
+            //         currentState,
+            //         elapsedTimeMilliseconds: this.getElapsedTimeMillseconds(startTimestampMilliseconds),
+            //         message: currentMessage,
+            //         pid: proc.pid,
+            //     };
+            //     this._logger.LogDebug("message received from command", eventData)
+            //     this.emitMessageReceived(eventData);
+            // });
 
             proc.on('error', (err) => {
                 // An error occurred while processing the command: https://nodejs.org/api/child_process.html#event-error
                 const durationMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
-                this.currentState = CommandStateName_Errored;
-                this.emitErrored({
+                currentState = CommandStateName_Errored;
+                const eventData: CommandErroredEventData = {
                     commandId,
-                    currentState: this.currentState,
+                    currentState,
                     elapsedTimeMilliseconds: durationMilliseconds,
                     error: err,
                     pid: proc.pid,
-                });
-                // TODO: resolve with result obj.
+                };
+                this._logger.LogError("command encountered an error", err, eventData)
+                this.emitErrored(eventData);
                 resolve({
                     commandId,
                     durationMilliseconds,
@@ -117,18 +135,20 @@ export abstract class CommandRunner extends EventEmitter {
 
             proc.on('close', (code) => {
                 // The process has ended and the stdio streams of the child process have been closed: https://nodejs.org/api/child_process.html#event-close
-                if (this.currentState === "running") {
+                if (currentState === "running") {
                     const durationMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
                     const currentCode = code ?? undefined;
-                    this.currentState = CommandStateName_Finished;
-                    this.emitFinished({
+                    currentState = CommandStateName_Finished;
+                    const eventData: CommandFinishedEventData = {
                         code: currentCode,
                         commandId,
-                        currentState: this.currentState,
+                        currentState,
                         elapsedTimeMilliseconds: durationMilliseconds,
+                        fullOutput: commandOutput,
                         pid: proc.pid,
-                    });
-                    // TODO: resolve with result obj.
+                    };
+                    this._logger.LogDebug("command closed", eventData);
+                    this.emitFinished(eventData);
                     resolve({
                         commandId,
                         durationMilliseconds,
@@ -141,18 +161,20 @@ export abstract class CommandRunner extends EventEmitter {
 
             proc.on('exit', (code) => {
                 // The child process has ended: https://nodejs.org/api/child_process.html#event-exit
-                if (this.currentState === "running") {
+                if (currentState === "running") {
                     const durationMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
                     const currentCode = code ?? undefined;
-                    this.currentState = CommandStateName_Finished;
-                    this.emitFinished({
+                    currentState = CommandStateName_Finished;
+                    const eventData: CommandFinishedEventData = {
                         code: currentCode,
                         commandId,
-                        currentState: this.currentState,
+                        currentState,
                         elapsedTimeMilliseconds: durationMilliseconds,
+                        fullOutput: commandOutput,
                         pid: proc.pid,
-                    });
-                    // TODO: resolve with result obj.
+                    };
+                    this._logger.LogDebug("command exited", eventData);
+                    this.emitFinished(eventData);
                     resolve({
                         commandId,
                         durationMilliseconds,
@@ -183,22 +205,24 @@ export abstract class CommandRunner extends EventEmitter {
                 timeoutTimer = setTimeout(() => {
                     clearTimeout(timeoutTimer);
                     // emit timedout event 
-                    if (this.currentState === "running") {
+                    if (currentState === "running") {
                         proc.kill("SIGKILL"); // Is this ok?
                         const durationMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
-                        this.currentState = CommandStateName_TimedOut;
-                        this.emitTimedout({
+                        currentState = CommandStateName_TimedOut;
+                        const eventData = {
                             commandId,
-                            currentState: this.currentState,
+                            currentState,
                             elapsedTimeMilliseconds: this.getElapsedTimeMillseconds(startTimestampMilliseconds),
                             pid: proc.pid,
                             timeoutMilliseconds: timeoutMilliseconds
-                        });
-                        // TODO: resolve with result obj.
+                        };
+                        const err = new ErrorCommandTimeOutExceeded(timeoutMilliseconds);
+                        this._logger.LogError("command timed out", err, eventData);
+                        this.emitTimedout(eventData);
                         resolve({
                             commandId,
                             durationMilliseconds,
-                            error: new ErrorCommandTimeOutExceeded(timeoutMilliseconds),
+                            error: err,
                             fullOutput: commandOutput,
                             success: false,
                         });

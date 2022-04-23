@@ -1,3 +1,5 @@
+import { VideoInfo } from './../models';
+import { randomUUID } from 'crypto';
 import { ILogger } from './../../Logger/Logger';
 import { FileInfo } from "../../FileManager";
 import { CommandRunner } from "../CommandRunner";
@@ -21,20 +23,26 @@ import {
     ConvertVideoContainerResult,
 } from "../models";
 
-
 export class FFMPEGVideoConverter extends CommandRunner implements IVideoConverter {
 
-    constructor(ffmpegCommand: string, logger: ILogger) {
-        super(ffmpegCommand, logger);
+    private _ffmpegCommand: string
+    private _ffprobeCommand: string
+
+    constructor(ffmpegCommand: string, ffprobeCommand: string, logger: ILogger) {
+        super(logger);
         this._logger = logger;
+        this._ffmpegCommand = ffmpegCommand ?? "ffmpeg";
+        this._ffprobeCommand = ffprobeCommand ?? "ffprobe";
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public override async checkCommand(_: string[]): Promise<boolean> {
-        this._logger.LogDebug("checking to see if command can be run.", {command: this._command})
-        const result = await this.executeCommand(["-h"], "test", 10000000);
-        this._logger.LogDebug("finished check of command", result);
-        return result?.success === true
+        this._logger.LogDebug("checking to see if command can be run.", { command: this._ffmpegCommand })
+        const ffmpegResult = await this.executeCommand(this._ffmpegCommand, ["-h"], "test-ffmpeg", 10000000);
+        this._logger.LogDebug("finished check of command", ffmpegResult);
+        const ffProbeResult = await this.executeCommand(this._ffprobeCommand, ["-L"], "test-ffprobe", 10000000);
+        this._logger.LogDebug("finished check of command", ffProbeResult);
+        return ffmpegResult?.success === true && ffProbeResult?.success === true
     }
 
     protected override emitStarted(data: CommandStartedEventData) {
@@ -61,10 +69,28 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this.emit(VideoConverterEventName_Timedout, data);
     }
 
+    // TODO: add command timeout parameter
+    public async GetVideoInfo(sourceFile: FileInfo): Promise<VideoInfo> {
+        const args = [
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
+            "-show_format",
+            "-show_streams",
+            `"${sourceFile.fullPath}"`,
+        ];
+        const commandResults = await this.executeCommand(this._ffprobeCommand, args, `GetVideoInfo-${randomUUID()}`, 0)
+        const joinedCommandOutput = commandResults.fullOutput.join("");
+        const videoInfo: VideoInfo = JSON.parse(joinedCommandOutput);
+        this._logger.LogVerbose("video info retreived", {videoInfo})
+        return videoInfo;
+    }
 
+    // TODO: add command timeout parameter
     public async ConvertVideoCodec(sourceFile: FileInfo, options: ConvertVideoCodecOptions): Promise<ConvertVideoCodecResult> {
         // TODO: craft the ffmpeg command.
-        const commandResult = await this.executeCommand([], "test1", 0);
+        const commandResult = await this.executeCommand(this._ffmpegCommand, [], `ConvertVideoCodec-${randomUUID()}`, 0);
         // TODO: compute pre and post size, stuff like that?
         return {
             duration: commandResult.durationMilliseconds,
@@ -72,9 +98,10 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         }
     }
 
+    // TODO: add command timeout parameter
     public async ConvertVideoContainer(sourceFile: FileInfo, options: ConvertVideoContainerOptions): Promise<ConvertVideoContainerResult> {
         // TODO: craft the ffmpeg command.
-        const commandResult = await this.executeCommand([], "test2", 0);
+        const commandResult = await this.executeCommand(this._ffmpegCommand, [], `ConvertVideoContainer-${randomUUID()}`, 0);
         // TODO: compute pre and post size, stuff like that?
         return {
             duration: commandResult.durationMilliseconds,

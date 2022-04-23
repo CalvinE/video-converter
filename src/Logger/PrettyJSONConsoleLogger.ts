@@ -11,9 +11,6 @@ export class PrettyJSONConsoleLogger extends BaseStructuredLogger {
     }
     
     protected internalLogMessage(logObject: Record<string, unknown>): void {
-        console.dir(logObject, {
-            depth: 5,
-            compact: false,
-        });
+        console.dir(logObject);
     }
 }

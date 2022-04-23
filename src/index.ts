@@ -1,4 +1,5 @@
-import { FileLogger } from './Logger/FileLogger';
+import { FileManager } from './FileManager';
+import { FileLogger, PrettyJSONConsoleLogger } from './Logger';
 import { FFMPEGVideoConverter } from './VideoConverter';
 import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
 
@@ -12,10 +13,18 @@ async function run() {
     }
     // run the app?
     const logger = new FileLogger("verbose", "./logs", true);
+    // const logger = new PrettyJSONConsoleLogger("verbose");
     logger.LogDebug("This is a test", {})
-    const runner = new FFMPEGVideoConverter("ffmpeg", logger);
-    const result = await runner.checkCommand([]);    
-    logger.LogDebug("finshed!", {result});
+    const ffmpegVideoConverter = new FFMPEGVideoConverter("ffmpeg", "ffprobe", logger);
+    const result = await ffmpegVideoConverter.checkCommand([]);
+    const fileManager = new FileManager();
+    const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath!, 10);
+    for (const item of sourcePathContents) {
+        if (item.type === 'file') {
+            const details = await ffmpegVideoConverter.GetVideoInfo(item);
+            logger.LogDebug('temp', {});
+        }
+    }
     await logger.shutdown();
 }
 
