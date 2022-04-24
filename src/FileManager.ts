@@ -35,6 +35,8 @@ export interface IFileManager {
      * @returns boolean value. if true then the directory was created or already existed.
      */
     makeDir: (targetDir: string) => boolean
+
+    getFSItemFromPath: (itemPath: string) => FSItem
 }
 
 class ErrorDirectoryDoesNotExist extends Error {
@@ -117,7 +119,7 @@ export class FileManager implements IFileManager {
         return itemInfo.files;
     }
 
-    private getFSItemFromPath(itemPath: string): FSItem {
+    public getFSItemFromPath(itemPath: string): FSItem {
         const stats = fs.lstatSync(itemPath);
         const baseFSInfo = this.getBaseFSInfoFromPath(itemPath);
         if (stats.isDirectory()) {
