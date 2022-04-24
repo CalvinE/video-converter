@@ -8,6 +8,8 @@ const TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME = "targetContainerFormat";
 const TARGET_AUDIO_ENCODER_PATH_OPTION_NAME = "targetAudioEncoder";
 const TARGET_VIDEO_ENCODER_PATH_OPTION_NAME = "targetVideoEncoder";
 const TARGET_FILE_NAME_REGEX_OPTION_NAME = "targetFileNameRegex";
+const SAVE_PATH_OPTION_NAME = "savePath";
+const SAVE_IN_PLACE = "saveInPlace";
 const GET_INFO_OPTION_NAME = "getInfo";
 const CONVERT_VIDEO_OPTION_NAME = "convertVideo"
 const HELP_OPTION_NAME = "help";
@@ -19,6 +21,8 @@ export type AppOptions = {
     [TARGET_AUDIO_ENCODER_PATH_OPTION_NAME]: AudioEncoder;
     [TARGET_VIDEO_ENCODER_PATH_OPTION_NAME]: VideoEncoder;
     [TARGET_FILE_NAME_REGEX_OPTION_NAME]?: RegExp;
+    [SAVE_PATH_OPTION_NAME]: string;
+    [SAVE_IN_PLACE]: boolean;
     [GET_INFO_OPTION_NAME]: boolean;
     [CONVERT_VIDEO_OPTION_NAME]: boolean;
     [HELP_OPTION_NAME]: boolean;
@@ -33,6 +37,8 @@ export function ParseOptions(): AppOptions {
         targetContainerFormat: "copy",
         targetAudioEncoder: "copy",
         targetVideoEncoder: "copy",
+        savePath: "./video-converter-output",
+        saveInPlace: false,
         getInfo: false,
         convertVideo: false,
         help: false,
@@ -62,13 +68,17 @@ export function ParseOptions(): AppOptions {
                 // FIXME: for now all regex provided will be case insensitive...
                 options[TARGET_FILE_NAME_REGEX_OPTION_NAME] = new RegExp(argv[++i], "i");
                 break;
+            case SAVE_PATH_OPTION_NAME:
+                options[SAVE_PATH_OPTION_NAME] = argv[++i] ?? "";
+                break;
+            case SAVE_IN_PLACE:
+                options[SAVE_IN_PLACE] = true;
+                break;
             case GET_INFO_OPTION_NAME:
                 options[GET_INFO_OPTION_NAME] = true;
-                options[SOURCE_PATH_OPTION_NAME] = argv[++i];
                 break;
             case CONVERT_VIDEO_OPTION_NAME:
                 options[CONVERT_VIDEO_OPTION_NAME] = true;
-                options[SOURCE_PATH_OPTION_NAME] = argv[++i];
                 break;
             default:
                 // If we get here we did somthing wrong... print help and return?

@@ -82,6 +82,7 @@ export abstract class CommandRunner extends EventEmitter {
                 this.emitRunning(eventData);
             });
             
+            // TODO: Also capture std error? not seeing ffmpeg output when converting video...
             proc.stdout.on("data", (chunk) => {
                 const currentMessage = chunk.toString();
                 commandOutput.push(currentMessage);
@@ -159,31 +160,31 @@ export abstract class CommandRunner extends EventEmitter {
                 }
             });
 
-            proc.on('exit', (code) => {
-                // The child process has ended: https://nodejs.org/api/child_process.html#event-exit
-                if (currentState === "running") {
-                    const durationMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
-                    const currentCode = code ?? undefined;
-                    currentState = CommandStateName_Finished;
-                    const eventData: CommandFinishedEventData = {
-                        code: currentCode,
-                        commandId,
-                        currentState,
-                        elapsedTimeMilliseconds: durationMilliseconds,
-                        fullOutput: commandOutput,
-                        pid: proc.pid,
-                    };
-                    this._logger.LogDebug("command exited", eventData);
-                    this.emitFinished(eventData);
-                    resolve({
-                        commandId,
-                        durationMilliseconds,
-                        fullOutput: commandOutput,
-                        success: code === 0,
-                        exitCode: currentCode,
-                    });
-                }
-            });
+            // proc.on('exit', (code) => {
+            //     // The child process has ended: https://nodejs.org/api/child_process.html#event-exit
+            //     if (currentState === "running") {
+            //         const durationMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
+            //         const currentCode = code ?? undefined;
+            //         currentState = CommandStateName_Finished;
+            //         const eventData: CommandFinishedEventData = {
+            //             code: currentCode,
+            //             commandId,
+            //             currentState,
+            //             elapsedTimeMilliseconds: durationMilliseconds,
+            //             fullOutput: commandOutput,
+            //             pid: proc.pid,
+            //         };
+            //         this._logger.LogDebug("command exited", eventData);
+            //         this.emitFinished(eventData);
+            //         resolve({
+            //             commandId,
+            //             durationMilliseconds,
+            //             fullOutput: commandOutput,
+            //             success: code === 0,
+            //             exitCode: currentCode,
+            //         });
+            //     }
+            // });
 
             proc.on('disconnect', () => {
                 // The child process has disconnected: https://nodejs.org/api/child_process.html#event-disconnect

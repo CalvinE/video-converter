@@ -101,12 +101,12 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this._fileManager.makeDir(targetFilePath);
         const args: string[] = [
             "-i",
-            sourceFile.fullPath,
+            `"${sourceFile.fullPath}"`,
             "-c:v",
             options.targetVideoEncoding,
             "-c:a",
             options.targetAudioEncoding,
-            options.targetFileFullPath,
+            `"${options.targetFileFullPath}"`,
         ];
         const commandResult = await this.executeCommand(this._ffmpegCommand, args, options.commmandID, options.timeoutMilliseconds);
         if (commandResult.success === true) {

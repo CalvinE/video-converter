@@ -1,3 +1,4 @@
+import { join, resolve } from 'path';
 import { VideoGetInfoResult } from './VideoConverter/models';
 import { IOutputWriter } from './OutputWriter/models';
 import { ConsoleOutputWriter } from './OutputWriter/ConsoleOutputWriter';
@@ -7,20 +8,20 @@ import { FFMPEGVideoConverter, getVideoInfoCommandID } from './VideoConverter';
 import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
 
 const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
-// const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
+const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
 
 (async function() {
     const appOptions: AppOptions = ParseOptions();
     // const logger: ILogger = new PrettyJSONConsoleLogger("verbose");
-    const logger: ILogger = new FileLogger("verbose", "./logs", true);
+    const appLogger: ILogger = new FileLogger("verbose", "./logs", true);
     const outputWriter: IOutputWriter = new ConsoleOutputWriter();
     await outputWriter.initialize()
-    const fileManager = new FileManager(logger);
-    const ffmpegVideoConverter = new FFMPEGVideoConverter("ffmpeg", "ffprobe", logger, fileManager);
-    logger.LogDebug("checking to see if we have access to ffmpeg and ffprobe", {});
+    const fileManager = new FileManager(appLogger);
+    const ffmpegVideoConverter = new FFMPEGVideoConverter("ffmpeg", "ffprobe", appLogger, fileManager);
+    appLogger.LogDebug("checking to see if we have access to ffmpeg and ffprobe", {});
     const result = await ffmpegVideoConverter.checkCommand([]);
     if (!result) {
-        logger.LogError("check for ffmpeg and ffprobe failed", new Error("ffmpeg or ffprobe are not installed?"), {});
+        appLogger.LogError("check for ffmpeg and ffprobe failed", new Error("ffmpeg or ffprobe are not installed?"), {});
         return;
     }
     if (appOptions.help === true) {
@@ -32,7 +33,32 @@ const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
         await processVideoConvertCommand();
     }
     await outputWriter.shutdown();
-    await logger.shutdown();
+    await appLogger.shutdown();
+
+    function getTargetFileFullPath(logger: ILogger, sourceFile: FileInfo, options: AppOptions): string {
+        let targetFileFullPath: string;
+        logger.LogVerbose("attempting to build taget file full path", {source: sourceFile, options});
+        if (options.saveInPlace) {
+            targetFileFullPath = sourceFile.fullPath;
+            logger.LogDebug("save in place options set. using source file full path", {sourceFileFullPath: sourceFile.fullPath});
+        } else {
+            targetFileFullPath = resolve(options.savePath);
+            logger.LogDebug("using options save path for target file path", {targetFileFullPath})
+        }
+
+        let targetFileName: string;
+        if (options.targetContainerFormat === "copy") {
+            targetFileName = sourceFile.name;
+            logger.LogDebug("option target container format is set to copy, so we are not changing the extension", {});
+        } else {
+            targetFileName = `${sourceFile.name.substring(sourceFile.name.lastIndexOf("."))}.${options.targetContainerFormat}`;
+            logger.LogDebug("using option taget container format on file name", {targetFileName, targetContainerFormat: options.targetContainerFormat});
+        }
+
+        const result = join(targetFileFullPath, targetFileName);
+        logger.LogDebug("target file location built", {sourceFile, targetFileLocation: result});
+        return result;
+    }
 
     function getAllFiles(logger: ILogger, items: FSItem[], targetFileNameRegex?: RegExp,): FileInfo[] {
         const files: FileInfo[] = [];
@@ -63,66 +89,67 @@ const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
     }
 
     function processHelpCommand() {
-        logger.LogInfo("help command invoked", {});
+        appLogger.LogInfo("help command invoked", {});
         PrintHelp();
-        logger.LogInfo("help command finished", {});
+        appLogger.LogInfo("help command finished", {});
     }
 
     async function processGetInfo() {
-        logger.LogInfo("get info command invoked", {});
+        appLogger.LogInfo("get info command invoked", {});
         const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
-        const files = getAllFiles(logger, sourcePathContents, appOptions.targetFileNameRegex);
+        const files = getAllFiles(appLogger, sourcePathContents, appOptions.targetFileNameRegex);
         const numFiles = files.length;
-        logger.LogInfo("attempting to info for files", {
+        appLogger.LogInfo("attempting to info for files", {
             numFiles,
         });
         const fileDetails: VideoGetInfoResult[] = [];
         let i = 0;
         for (const f of files) {
-            logger.LogDebug(`attempting to get info for file ${i++} of ${numFiles}`, {});
+            appLogger.LogDebug(`attempting to get info for file ${i++} of ${numFiles}`, {});
             const details = await ffmpegVideoConverter.getVideoInfo(f, {
                 commmandID: getVideoInfoCommandID(),
                 timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
             });
             if (details.success) {
-                logger.LogVerbose(`got info for file ${i++} of ${numFiles}`, details);
+                appLogger.LogVerbose(`got info for file ${i++} of ${numFiles}`, details);
             } else {
-                logger.LogWarn(`failed to get info for file ${i++} of ${numFiles}`, details);
+                appLogger.LogWarn(`failed to get info for file ${i++} of ${numFiles}`, details);
             }
             fileDetails.push(details);
         }
         outputWriter.writeObject(fileDetails);
-        logger.LogInfo("get info command finished", {});
+        appLogger.LogInfo("get info command finished", {});
     }
 
     async function processVideoConvertCommand() {
         // TODO: write implementation for video conversion!
-        logger.LogInfo("video convert command invoked", {});
+        appLogger.LogInfo("video convert command invoked", {});
         const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
-        const files = getAllFiles(logger, sourcePathContents, appOptions.targetFileNameRegex);
+        const files = getAllFiles(appLogger, sourcePathContents, appOptions.targetFileNameRegex);
         const numFiles = files.length;
-        logger.LogInfo("attempting to convert files", {
+        appLogger.LogInfo("attempting to convert files", {
             numFiles,
         });        
         let i = 0;
         for (const f of files) {
-            logger.LogDebug(`attempting to convert file ${i++} of ${numFiles}`, {});
+            appLogger.LogDebug(`attempting to convert file ${i++} of ${numFiles}`, {});
             const details = await ffmpegVideoConverter.convertVideo(f, {
                 commmandID: getVideoInfoCommandID(),
-                timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
+                timeoutMilliseconds: CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS,
                 sourceFileFullPath: f.fullPath,
                 targetAudioEncoding: appOptions.targetAudioEncoder,
                 targetVideoEncoding: appOptions.targetVideoEncoder,
-                targetFileFullPath: "", // FIXME: make logic to get this...
+                targetFileFullPath: getTargetFileFullPath(appLogger, f, appOptions), // FIXME: make logic to get this...
             });
             if (details.success) {
-                logger.LogVerbose(`got info for file ${i++} of ${numFiles}`, details);
+                appLogger.LogVerbose(`got info for file ${i++} of ${numFiles}`, details);
             } else {
-                logger.LogWarn(`failed to get info for file ${i++} of ${numFiles}`, details);
+                appLogger.LogWarn(`failed to get info for file ${i++} of ${numFiles}`, details);
             }
         }
-        logger.LogInfo("video convert command finished", {});
+        appLogger.LogInfo("video convert command finished", {});
     }
 })().then(() => {
+    // FIXME: make sure we are canceling any running jobs. handler interrupts like Ctrl+C?
     process.exit();
 });

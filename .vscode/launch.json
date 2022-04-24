@@ -33,13 +33,32 @@
 		{
 			"type": "node",
 			"request": "launch",
-			"name": "First Test",
+			"name": "Test GetInfo",
 			"program": "${workspaceFolder}/build/index.js",
 			"args": [
+				"--targetFileNameRegex",
+				".*\\.mp4",
+				"--getInfo",
 				"--sourcePath",
-				"F:\\Bob's Burgers\\Bob's Burgers Season 1"
+				"D:\\Bob's Burgers\\Bob's Burgers Season 1"
 			],
 			"protocol": "inspector",
 		},
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "Test ConvertVideo",
+			"program": "${workspaceFolder}/build/index.js",
+			"args": [
+				"--targetFileNameRegex",
+				".*\\.mp4",
+				"--convertVideo",
+				"--sourcePath",
+				"D:\\Bob's Burgers\\Bob's Burgers Season 1",
+				"--targetVideoEncoder",
+				"libx265",
+			],
+			"protocol": "inspector",
+		}, // libx265
     ]
 }
