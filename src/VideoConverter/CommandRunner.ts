@@ -10,6 +10,7 @@ export type CommandResult = {
     error?: Error;
     exitCode?: number
     fullOutput: string[];
+    fullStdErrOutput: string[];
     success: boolean;
 };
 
@@ -50,6 +51,7 @@ export abstract class CommandRunner extends EventEmitter {
             let currentState: CommandState;
             let timeoutTimer: NodeJS.Timeout;
             const commandOutput: string[] = [];
+            const commandStdErrOutput: string[] = [];
             const startTimestampMilliseconds = Date.now();
             this._logger.LogVerbose("about to run command", {
                 command: command,
@@ -81,8 +83,23 @@ export abstract class CommandRunner extends EventEmitter {
                 this._logger.LogDebug("command process spawned", eventData)
                 this.emitRunning(eventData);
             });
+
+            //TODO: apparently ffmpeg output I care about goes to stderr...
+            // need to have a different handler for stderr and try to parse it?
+            proc.stderr.on("data", (chunk) => {
+                const currentMessage = chunk.toString();
+                commandStdErrOutput.push(currentMessage);
+                const eventData = {
+                    commandId,
+                    currentState,
+                    elapsedTimeMilliseconds: this.getElapsedTimeMillseconds(startTimestampMilliseconds),
+                    message: currentMessage,
+                    pid: proc.pid,
+                };
+                this._logger.LogDebug("message received from command stderr", eventData)
+                // this.emitMessageReceived(eventData);
+            });
             
-            // TODO: Also capture std error? not seeing ffmpeg output when converting video...
             proc.stdout.on("data", (chunk) => {
                 const currentMessage = chunk.toString();
                 commandOutput.push(currentMessage);
@@ -129,6 +146,7 @@ export abstract class CommandRunner extends EventEmitter {
                     commandId,
                     durationMilliseconds,
                     fullOutput: commandOutput,
+                    fullStdErrOutput: commandStdErrOutput,
                     success: false,
                     error: err,
                 });
@@ -154,6 +172,7 @@ export abstract class CommandRunner extends EventEmitter {
                         commandId,
                         durationMilliseconds,
                         fullOutput: commandOutput,
+                        fullStdErrOutput: commandStdErrOutput,
                         success: code === 0,
                         exitCode: currentCode,
                     });
@@ -225,6 +244,7 @@ export abstract class CommandRunner extends EventEmitter {
                             durationMilliseconds,
                             error: err,
                             fullOutput: commandOutput,
+                            fullStdErrOutput: commandStdErrOutput,
                             success: false,
                         });
                     }

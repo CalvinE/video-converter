@@ -1,5 +1,5 @@
 import { join, resolve } from 'path';
-import { VideoGetInfoResult } from './VideoConverter/models';
+import { getConvertVideoCommandID, VideoGetInfoResult } from './VideoConverter/models';
 import { IOutputWriter } from './OutputWriter/models';
 import { ConsoleOutputWriter } from './OutputWriter/ConsoleOutputWriter';
 import { FileManager, FSItem, FileInfo } from './FileManager';
@@ -122,29 +122,35 @@ const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
     }
 
     async function processVideoConvertCommand() {
-        // TODO: write implementation for video conversion!
         appLogger.LogInfo("video convert command invoked", {});
+        outputWriter.writeString("video convert command invoked");
         const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
         const files = getAllFiles(appLogger, sourcePathContents, appOptions.targetFileNameRegex);
         const numFiles = files.length;
         appLogger.LogInfo("attempting to convert files", {
             numFiles,
-        });        
+        });
+        outputWriter.writeString(`attempting to convert ${numFiles} files`);
         let i = 0;
         for (const f of files) {
             appLogger.LogDebug(`attempting to convert file ${i++} of ${numFiles}`, {});
+            outputWriter.writeString(`attempting to convert file ${i++} of ${numFiles}`);
+            const targetFileFullPath = getTargetFileFullPath(appLogger, f, appOptions);
             const details = await ffmpegVideoConverter.convertVideo(f, {
-                commmandID: getVideoInfoCommandID(),
+                commmandID: getConvertVideoCommandID(),
                 timeoutMilliseconds: CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS,
                 sourceFileFullPath: f.fullPath,
                 targetAudioEncoding: appOptions.targetAudioEncoder,
                 targetVideoEncoding: appOptions.targetVideoEncoder,
-                targetFileFullPath: getTargetFileFullPath(appLogger, f, appOptions), // FIXME: make logic to get this...
+                targetFileFullPath: targetFileFullPath,
             });
             if (details.success) {
-                appLogger.LogVerbose(`got info for file ${i++} of ${numFiles}`, details);
+                appLogger.LogVerbose(`converted file ${i++} of ${numFiles}`, details);
+                outputWriter.writeString(`converted file ${i++} of ${numFiles}`);
+                outputWriter.writeString(`source: ${f.fullPath} => target: ${targetFileFullPath}`)
             } else {
-                appLogger.LogWarn(`failed to get info for file ${i++} of ${numFiles}`, details);
+                appLogger.LogWarn(`failed to convert file ${i++} of ${numFiles}`, details);
+                outputWriter.writeString(`failed to convert file ${i++} of ${numFiles}`);
             }
         }
         appLogger.LogInfo("video convert command finished", {});
