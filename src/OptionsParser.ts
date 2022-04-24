@@ -9,6 +9,7 @@ const TARGET_AUDIO_ENCODER_PATH_OPTION_NAME = "targetAudioEncoder";
 const TARGET_VIDEO_ENCODER_PATH_OPTION_NAME = "targetVideoEncoder";
 const TARGET_FILE_NAME_REGEX_OPTION_NAME = "targetFileNameRegex";
 const SAVE_PATH_OPTION_NAME = "savePath";
+const COPY_RELATIVE_FOLDER_PATHS = "copyRelativeFolderPath";
 const SAVE_IN_PLACE = "saveInPlace";
 const GET_INFO_OPTION_NAME = "getInfo";
 const CONVERT_VIDEO_OPTION_NAME = "convertVideo"
@@ -22,6 +23,7 @@ export type AppOptions = {
     [TARGET_VIDEO_ENCODER_PATH_OPTION_NAME]: VideoEncoder;
     [TARGET_FILE_NAME_REGEX_OPTION_NAME]?: RegExp;
     [SAVE_PATH_OPTION_NAME]: string;
+    [COPY_RELATIVE_FOLDER_PATHS]: boolean;
     [SAVE_IN_PLACE]: boolean;
     [GET_INFO_OPTION_NAME]: boolean;
     [CONVERT_VIDEO_OPTION_NAME]: boolean;
@@ -39,6 +41,7 @@ export function ParseOptions(): AppOptions {
         targetVideoEncoder: "copy",
         savePath: "./video-converter-output",
         saveInPlace: false,
+        copyRelativeFolderPath: false,
         getInfo: false,
         convertVideo: false,
         help: false,
@@ -73,6 +76,9 @@ export function ParseOptions(): AppOptions {
                 break;
             case SAVE_IN_PLACE:
                 options[SAVE_IN_PLACE] = true;
+                break;
+            case COPY_RELATIVE_FOLDER_PATHS:
+                options[COPY_RELATIVE_FOLDER_PATHS] = true;
                 break;
             case GET_INFO_OPTION_NAME:
                 options[GET_INFO_OPTION_NAME] = true;

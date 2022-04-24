@@ -1,10 +1,10 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
 			"type": "node",
 			"request": "launch",
 			"name": "Mocha Tests",
@@ -40,7 +40,7 @@
 				".*\\.mp4",
 				"--getInfo",
 				"--sourcePath",
-				"D:\\Bob's Burgers\\Bob's Burgers Season 1"
+				"F:\\Bob's Burgers\\Bob's Burgers Season 1"
 			],
 			"protocol": "inspector",
 		},
@@ -54,11 +54,12 @@
 				".*\\.mp4",
 				"--convertVideo",
 				"--sourcePath",
-				"D:\\Bob's Burgers\\Bob's Burgers Season 1",
+				"F:\\Bob's Burgers",
 				"--targetVideoEncoder",
 				"libx265",
+				"--copyRelativeFolderPath",
 			],
 			"protocol": "inspector",
 		}, // libx265
-    ]
+	]
 }

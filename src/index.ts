@@ -10,7 +10,7 @@ import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
 const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
 const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
 
-(async function() {
+(async function () {
     const start = new Date();
     const appOptions: AppOptions = ParseOptions();
     // const logger: ILogger = new PrettyJSONConsoleLogger("verbose");
@@ -39,14 +39,19 @@ const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
 
     function getTargetFileFullPath(logger: ILogger, sourceFile: FileInfo, options: AppOptions): string {
         let targetFileFullPath: string;
-        logger.LogVerbose("attempting to build taget file full path", {source: sourceFile, options});
+        logger.LogVerbose("attempting to build taget file full path", { source: sourceFile, options });
         if (options.saveInPlace) {
             targetFileFullPath = sourceFile.fullPath;
-            logger.LogDebug("save in place options set. using source file full path", {sourceFileFullPath: sourceFile.fullPath});
+            logger.LogDebug("save in place options set. using source file full path", { sourceFileFullPath: sourceFile.fullPath });
+        } else if (options.copyRelativeFolderPath) {
+            const fullRelativePath = join(options.savePath, sourceFile.relativepath);
+            targetFileFullPath = resolve(fullRelativePath);
+            logger.LogDebug("using options save path and source file relative path for target file path", { targetFileFullPath });
         } else {
             targetFileFullPath = resolve(options.savePath);
-            logger.LogDebug("using options save path for target file path", {targetFileFullPath})
+            logger.LogDebug("using options save path for target file path", { targetFileFullPath });
         }
+
 
         let targetFileName: string;
         if (options.targetContainerFormat === "copy") {
@@ -54,11 +59,11 @@ const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
             logger.LogDebug("option target container format is set to copy, so we are not changing the extension", {});
         } else {
             targetFileName = `${sourceFile.name.substring(sourceFile.name.lastIndexOf("."))}.${options.targetContainerFormat}`;
-            logger.LogDebug("using option taget container format on file name", {targetFileName, targetContainerFormat: options.targetContainerFormat});
+            logger.LogDebug("using option taget container format on file name", { targetFileName, targetContainerFormat: options.targetContainerFormat });
         }
 
         const result = join(targetFileFullPath, targetFileName);
-        logger.LogDebug("target file location built", {sourceFile, targetFileLocation: result});
+        logger.LogDebug("target file location built", { sourceFile, targetFileLocation: result });
         return result;
     }
 
@@ -160,7 +165,7 @@ const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
                 outputWriter.writeString(`failed to convert file ${i} of ${numFiles}`);
             }
         }
-        appLogger.LogInfo("video convert command finished", {totalRunTimeMilliseconds, totalSizeDifference});
+        appLogger.LogInfo("video convert command finished", { totalRunTimeMilliseconds, totalSizeDifference });
         outputWriter.writeString(`video convert command finished: total run time (ms) = ${totalRunTimeMilliseconds} - total size difference (bytes) = ${totalSizeDifference}`);
     }
 })().then(() => {
