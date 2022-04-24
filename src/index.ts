@@ -9,7 +9,7 @@ import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
 const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
 // const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
 
-async function run() {
+(async function() {
     const appOptions: AppOptions = ParseOptions();
     // const logger: ILogger = new PrettyJSONConsoleLogger("verbose");
     const logger: ILogger = new FileLogger("verbose", "./logs", true);
@@ -101,8 +101,6 @@ async function run() {
 
         logger.LogInfo("video convert command finished", {});
     }
-}
-
-run().then(() => {
+})().then(() => {
     process.exit();
 });
