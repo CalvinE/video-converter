@@ -1,6 +1,5 @@
 import { IFileManager } from './../../FileManager';
-import { GetVideoInfoOptions, VideoInfo } from './../models';
-import { randomUUID } from 'crypto';
+import { GetVideoInfoOptions, VideoGetInfoResult, VideoInfo } from './../models';
 import { ILogger } from './../../Logger/Logger';
 import { FileInfo } from "../../FileManager";
 import { CommandRunner } from "../CommandRunner";
@@ -72,7 +71,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
     }
 
     // TODO: add command timeout parameter
-    public async GetVideoInfo(sourceFile: FileInfo, options: GetVideoInfoOptions): Promise<VideoInfo> {
+    public async getVideoInfo(sourceFile: FileInfo, options: GetVideoInfoOptions): Promise<VideoGetInfoResult> {
         const args = [
             "-v",
             "quiet",
@@ -86,10 +85,17 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         const joinedCommandOutput = commandResults.fullOutput.join("");
         const videoInfo: VideoInfo = JSON.parse(joinedCommandOutput);
         this._logger.LogVerbose("video info retreived", { videoInfo })
-        return videoInfo;
+        return {
+            commandID: options.commmandID,
+            duration: commandResults.durationMilliseconds,
+            size: sourceFile.size,
+            sourceFileFullPath: sourceFile.fullPath,
+            success: commandResults.success,
+            videoInfo,
+        };
     }
 
-    public async ConvertVideo(sourceFile: FileInfo, options: VideoConvertOptions): Promise<VideoConvertResult> {
+    public async convertVideo(sourceFile: FileInfo, options: VideoConvertOptions): Promise<VideoConvertResult> {
         this._logger.LogDebug("attempting to convert a video", { sourceFile, options });
         const targetFilePath: string = dirname(options.targetFileFullPath)
         this._fileManager.makeDir(targetFilePath);
@@ -102,10 +108,11 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             options.targetAudioEncoding,
             options.targetFileFullPath,
         ];
-        const commandResult = await this.executeCommand(this._ffmpegCommand, args, `ConvertVideoCodec-${randomUUID()}`, options.timeoutMilliseconds);
+        const commandResult = await this.executeCommand(this._ffmpegCommand, args, options.commmandID, options.timeoutMilliseconds);
         if (commandResult.success === true) {
             const targetFileInfo: FileInfo = (this._fileManager.getFSItemFromPath(options.targetFileFullPath) as FileInfo);
             return {
+                commandID: options.commmandID,
                 duration: commandResult.durationMilliseconds,
                 success: commandResult.success,
                 sourceFileFullPath: sourceFile.fullPath,
@@ -114,6 +121,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             }
         }
         return {
+            commandID: options.commmandID,
             duration: commandResult.durationMilliseconds,
             success: commandResult.success,
             sourceFileFullPath: sourceFile.fullPath,

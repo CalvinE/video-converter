@@ -76,4 +76,5 @@ export interface ILogger {
     LogInfo: (message: string, data: Record<string, unknown>) => void;
     LogWarn: (message: string, data: Record<string, unknown>) => void;
     LogError: (message: string, err: Error, data: Record<string, unknown>) => void;
+    shutdown: () => Promise<void>
 }

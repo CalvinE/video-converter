@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { FileInfo } from "../FileManager";
 
 /**
@@ -55,11 +56,10 @@ export type VideoConvertOptions = BaseVideoConverterOptions & {
 };
 
 type BaseVideoConverterResult = {
-  success: boolean;
+  commandID: string;
   duration: number;
+  success: boolean;
   sourceFileFullPath: string;
-  targetFileFullPath: string;
-  sizeDifference: number;
 }
 
 type BaseVideoConverterEvent = {
@@ -91,12 +91,27 @@ export type CommandTimedoutEventData = BaseVideoConverterEvent & {
   timeoutMilliseconds: number;
 };
 
+export type VideoGetInfoResult = BaseVideoConverterResult & {
+  size: number;
+  videoInfo: VideoInfo;
+}
 
-export type VideoConvertResult = BaseVideoConverterResult;
+export type VideoConvertResult = BaseVideoConverterResult & {
+  targetFileFullPath: string;
+  sizeDifference: number;
+};
 
 export interface IVideoConverter {
-  GetVideoInfo: (sourceFile: FileInfo, options: GetVideoInfoOptions) => Promise<VideoInfo>;
-  ConvertVideo: (sourceFile: FileInfo, options: VideoConvertOptions) => Promise<VideoConvertResult>;
+  getVideoInfo: (sourceFile: FileInfo, options: GetVideoInfoOptions) => Promise<VideoGetInfoResult>;
+  convertVideo: (sourceFile: FileInfo, options: VideoConvertOptions) => Promise<VideoConvertResult>;
+}
+
+export function getVideoInfoCommandID(): string {
+  return `getVideoInfo-${randomUUID()}`
+}
+
+export function getConvertVideoCommandID(): string {
+  return `convertVideoCodec-${randomUUID()}`
 }
 
 export type VideoInfo = {

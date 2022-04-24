@@ -7,6 +7,7 @@ const TARGET_ROOT_PATH_OPTION_NAME = "targetRootPath";
 const TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME = "targetContainerFormat";
 const TARGET_AUDIO_ENCODER_PATH_OPTION_NAME = "targetAudioEncoder";
 const TARGET_VIDEO_ENCODER_PATH_OPTION_NAME = "targetVideoEncoder";
+const TARGET_FILE_NAME_REGEX_OPTION_NAME = "targetFileNameRegex";
 const GET_INFO_OPTION_NAME = "getInfo";
 const CONVERT_VIDEO_OPTION_NAME = "convertVideo"
 const HELP_OPTION_NAME = "help";
@@ -17,6 +18,7 @@ export type AppOptions = {
     [TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME]: VideoContainerFormat;
     [TARGET_AUDIO_ENCODER_PATH_OPTION_NAME]: AudioEncoder;
     [TARGET_VIDEO_ENCODER_PATH_OPTION_NAME]: VideoEncoder;
+    [TARGET_FILE_NAME_REGEX_OPTION_NAME]?: RegExp;
     [GET_INFO_OPTION_NAME]: boolean;
     [CONVERT_VIDEO_OPTION_NAME]: boolean;
     [HELP_OPTION_NAME]: boolean;
@@ -55,6 +57,10 @@ export function ParseOptions(): AppOptions {
                 break;
             case TARGET_VIDEO_ENCODER_PATH_OPTION_NAME:
                 options[TARGET_VIDEO_ENCODER_PATH_OPTION_NAME] = (argv[++i] as VideoEncoder) ?? INVALID;
+                break;
+            case TARGET_FILE_NAME_REGEX_OPTION_NAME:
+                // FIXME: for now all regex provided will be case insensitive...
+                options[TARGET_FILE_NAME_REGEX_OPTION_NAME] = new RegExp(argv[++i], "i");
                 break;
             case GET_INFO_OPTION_NAME:
                 options[GET_INFO_OPTION_NAME] = true;
