@@ -73,7 +73,7 @@ const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
         const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
         const files = getAllFiles(logger, sourcePathContents, appOptions.targetFileNameRegex);
         const numFiles = files.length;
-        logger.LogInfo("getting info for files", {
+        logger.LogInfo("attempting to info for files", {
             numFiles,
         });
         const fileDetails: VideoGetInfoResult[] = [];
@@ -98,7 +98,29 @@ const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
     async function processVideoConvertCommand() {
         // TODO: write implementation for video conversion!
         logger.LogInfo("video convert command invoked", {});
-
+        const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
+        const files = getAllFiles(logger, sourcePathContents, appOptions.targetFileNameRegex);
+        const numFiles = files.length;
+        logger.LogInfo("attempting to convert files", {
+            numFiles,
+        });        
+        let i = 0;
+        for (const f of files) {
+            logger.LogDebug(`attempting to convert file ${i++} of ${numFiles}`, {});
+            const details = await ffmpegVideoConverter.convertVideo(f, {
+                commmandID: getVideoInfoCommandID(),
+                timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
+                sourceFileFullPath: f.fullPath,
+                targetAudioEncoding: appOptions.targetAudioEncoder,
+                targetVideoEncoding: appOptions.targetVideoEncoder,
+                targetFileFullPath: "", // FIXME: make logic to get this...
+            });
+            if (details.success) {
+                logger.LogVerbose(`got info for file ${i++} of ${numFiles}`, details);
+            } else {
+                logger.LogWarn(`failed to get info for file ${i++} of ${numFiles}`, details);
+            }
+        }
         logger.LogInfo("video convert command finished", {});
     }
 })().then(() => {
