@@ -11,6 +11,7 @@ const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
 const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
 
 (async function() {
+    const start = new Date();
     const appOptions: AppOptions = ParseOptions();
     // const logger: ILogger = new PrettyJSONConsoleLogger("verbose");
     const appLogger: ILogger = new FileLogger("verbose", "./logs", true);
@@ -32,6 +33,7 @@ const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
     } else if (appOptions.convertVideo === true) {
         await processVideoConvertCommand();
     }
+
     await outputWriter.shutdown();
     await appLogger.shutdown();
 
@@ -122,6 +124,8 @@ const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
     }
 
     async function processVideoConvertCommand() {
+        let totalRunTimeMilliseconds = 0;
+        let totalSizeDifference = 0;
         appLogger.LogInfo("video convert command invoked", {});
         outputWriter.writeString("video convert command invoked");
         const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
@@ -133,8 +137,9 @@ const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
         outputWriter.writeString(`attempting to convert ${numFiles} files`);
         let i = 0;
         for (const f of files) {
-            appLogger.LogDebug(`attempting to convert file ${i++} of ${numFiles}`, {});
-            outputWriter.writeString(`attempting to convert file ${i++} of ${numFiles}`);
+            i++;
+            appLogger.LogDebug(`attempting to convert file ${i} of ${numFiles}`, {});
+            outputWriter.writeString(`attempting to convert file ${i} of ${numFiles}`);
             const targetFileFullPath = getTargetFileFullPath(appLogger, f, appOptions);
             const details = await ffmpegVideoConverter.convertVideo(f, {
                 commmandID: getConvertVideoCommandID(),
@@ -144,16 +149,19 @@ const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
                 targetVideoEncoding: appOptions.targetVideoEncoder,
                 targetFileFullPath: targetFileFullPath,
             });
+            totalRunTimeMilliseconds += details.duration;
+            totalSizeDifference += details.sizeDifference;
             if (details.success) {
-                appLogger.LogVerbose(`converted file ${i++} of ${numFiles}`, details);
-                outputWriter.writeString(`converted file ${i++} of ${numFiles}`);
+                appLogger.LogVerbose(`converted file ${i} of ${numFiles}`, details);
+                outputWriter.writeString(`converted file ${i} of ${numFiles}`);
                 outputWriter.writeString(`source: ${f.fullPath} => target: ${targetFileFullPath}`)
             } else {
-                appLogger.LogWarn(`failed to convert file ${i++} of ${numFiles}`, details);
-                outputWriter.writeString(`failed to convert file ${i++} of ${numFiles}`);
+                appLogger.LogWarn(`failed to convert file ${i} of ${numFiles}`, details);
+                outputWriter.writeString(`failed to convert file ${i} of ${numFiles}`);
             }
         }
-        appLogger.LogInfo("video convert command finished", {});
+        appLogger.LogInfo("video convert command finished", {totalRunTimeMilliseconds, totalSizeDifference});
+        outputWriter.writeString(`video convert command finished: total run time (ms) = ${totalRunTimeMilliseconds} - total size difference (bytes) = ${totalSizeDifference}`);
     }
 })().then(() => {
     // FIXME: make sure we are canceling any running jobs. handler interrupts like Ctrl+C?
