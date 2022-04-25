@@ -17,6 +17,9 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
     TODO: list
     * Improve code here so there is not so much in one place to try and read...
     * add file filter mode to get all video file formats?
+    * produce a stats object we can write to another file?
+    * Have a job state file so jobs can be resumed if cancelled.
+    * handle signals to cancel the command properly like Ctrl+C
 */
 
 (async function () {
