@@ -1,6 +1,8 @@
 export interface IOutputWriter {
+    supportsProgressiveUpdates(): boolean;
     initialize(): Promise<void>;
-    writeString(message:string): Promise<void>;
-    writeObject(data: unknown): Promise<void>;
+    write(message: string): void;
+    writeLine(message: string): void;
+    writeObject(data: unknown): void;
     shutdown(): Promise<void>;
 }

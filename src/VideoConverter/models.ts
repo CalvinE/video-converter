@@ -24,12 +24,13 @@ export type AudioEncoder = `${typeof COPY | typeof INVALID}`;
 
 export const VideoConverterEventName_Started = "starting"
 export const VideoConverterEventName_Running = "running"
-export const VideoConverterEventName_MessageReceived = "message-received"
+export const VideoConverterEventName_StdOutMessageReceived = "stdout-message-received"
+export const VideoConverterEventName_StdErrMessageReceived = "stderr-message-received"
 export const VideoConverterEventName_Finished = "finished"
 export const VideoConverterEventName_Errored = "errored"
 export const VideoConverterEventName_Timedout = "timedout"
 
-export type VideoConverterEvent = `${typeof VideoConverterEventName_Started | typeof VideoConverterEventName_Running | typeof VideoConverterEventName_MessageReceived | typeof VideoConverterEventName_Finished | typeof VideoConverterEventName_Errored | typeof VideoConverterEventName_Timedout}`;
+export type VideoConverterEvent = `${typeof VideoConverterEventName_Started | typeof VideoConverterEventName_Running | typeof VideoConverterEventName_StdOutMessageReceived | typeof VideoConverterEventName_Finished | typeof VideoConverterEventName_Errored | typeof VideoConverterEventName_Timedout}`;
 
 export const CommandStateName_Pending = "pending"
 export const CommandStateName_Started = "started"
@@ -42,7 +43,7 @@ export type CommandState = `${typeof CommandStateName_Pending | typeof CommandSt
 
 
 type BaseVideoConverterOptions = {
-  commmandID: string;
+  commandID: string;
   timeoutMilliseconds: number;
 };
 
@@ -73,9 +74,11 @@ export type CommandStartedEventData = BaseVideoConverterEvent;
 
 export type CommandRunningEventData = BaseVideoConverterEvent;
 
-export type CommandMessageReceivedEventData = BaseVideoConverterEvent & {
+export type CommandStdOutMessageReceivedEventData = BaseVideoConverterEvent & {
   message: string;
 };
+
+export type CommandStdErrMessageReceivedEventData = CommandStdOutMessageReceivedEventData;
 
 export type CommandFinishedEventData = BaseVideoConverterEvent & {
   code?: number;

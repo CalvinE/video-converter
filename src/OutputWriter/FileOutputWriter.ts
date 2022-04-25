@@ -18,19 +18,28 @@ export class FileOutputWriter implements IOutputWriter {
         });
     }
 
+    public supportsProgressiveUpdates(): boolean {
+        return false;
+    }
+
     public initialize(): Promise<void> {
         return Promise.resolve();
     }
 
-    public writeString(message: string): Promise<void> {
-        this._fileWriter.write(`${message}${EOL}`);
-        return Promise.resolve();
+    public write(message: string): void {
+        this._fileWriter.write(message);
+        return;
     }
 
-    public writeObject(data: unknown): Promise<void> {
+    public writeLine(message: string): void {
+        this._fileWriter.write(`${message}${EOL}`);
+        return;
+    }
+
+    public writeObject(data: unknown): void {
         const dataString = JSON.stringify(data);
         this._fileWriter.write(`${dataString}${EOL}`);
-        return Promise.resolve();
+        return;
     }
 
     public shutdown(): Promise<void> {

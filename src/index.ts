@@ -1,5 +1,5 @@
 import { join, resolve } from 'path';
-import { getConvertVideoCommandID, VideoGetInfoResult } from './VideoConverter/models';
+import { CommandStdErrMessageReceivedEventData, getConvertVideoCommandID, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions } from './VideoConverter/models';
 import { IOutputWriter } from './OutputWriter/models';
 import { ConsoleOutputWriter } from './OutputWriter/ConsoleOutputWriter';
 import { FileManager, FSItem, FileInfo } from './FileManager';
@@ -9,9 +9,17 @@ import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
 
 const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
 const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
+const FFMPEG_CURRENT_FRAME_REGEX = /frame=\s*(?<framenumber>\d+)/;
+
+const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
+
+/* 
+    TODO: list
+    * Improve code here so there is not so much in one place to try and read...
+    * add file filter mode to get all video file formats?
+*/
 
 (async function () {
-    const start = new Date();
     const appOptions: AppOptions = ParseOptions();
     // const logger: ILogger = new PrettyJSONConsoleLogger("verbose");
     const appLogger: ILogger = new FileLogger("verbose", "./logs", true);
@@ -20,22 +28,28 @@ const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
     const fileManager = new FileManager(appLogger);
     const ffmpegVideoConverter = new FFMPEGVideoConverter("ffmpeg", "ffprobe", appLogger, fileManager);
     appLogger.LogDebug("checking to see if we have access to ffmpeg and ffprobe", {});
-    const result = await ffmpegVideoConverter.checkCommand([]);
-    if (!result) {
-        appLogger.LogError("check for ffmpeg and ffprobe failed", new Error("ffmpeg or ffprobe are not installed?"), {});
-        return;
-    }
-    if (appOptions.help === true) {
-        // print help and return...
-        processHelpCommand();
-    } else if (appOptions.getInfo === true) {
-        await processGetInfo();
-    } else if (appOptions.convertVideo === true) {
-        await processVideoConvertCommand();
-    }
+    try {
+        const result = await ffmpegVideoConverter.checkCommand([]);
+        if (!result) {
+            appLogger.LogError("check for ffmpeg and ffprobe failed", new Error("ffmpeg or ffprobe are not installed?"), {});
+            return;
+        }
+        if (appOptions.help === true) {
+            // print help and return...
+            processHelpCommand();
+        } else if (appOptions.getInfo === true) {
+            await processGetInfo();
+        } else if (appOptions.convertVideo === true) {
+            await processVideoConvertCommand();
+        }
 
-    await outputWriter.shutdown();
-    await appLogger.shutdown();
+    } catch (err: unknown) {
+        appLogger.LogError("app encountered fatal error!", err as Error, {});
+        outputWriter.writeLine("app encountered fatal error, please see the logs");
+    } finally {
+        await outputWriter.shutdown();
+        await appLogger.shutdown();
+    }
 
     function getTargetFileFullPath(logger: ILogger, sourceFile: FileInfo, options: AppOptions): string {
         let targetFileFullPath: string;
@@ -114,7 +128,7 @@ const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
         for (const f of files) {
             appLogger.LogDebug(`attempting to get info for file ${i++} of ${numFiles}`, {});
             const details = await ffmpegVideoConverter.getVideoInfo(f, {
-                commmandID: getVideoInfoCommandID(),
+                commandID: getVideoInfoCommandID(),
                 timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
             });
             if (details.success) {
@@ -132,41 +146,85 @@ const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
         let totalRunTimeMilliseconds = 0;
         let totalSizeDifference = 0;
         appLogger.LogInfo("video convert command invoked", {});
-        outputWriter.writeString("video convert command invoked");
+        outputWriter.writeLine("video convert command invoked");
         const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
         const files = getAllFiles(appLogger, sourcePathContents, appOptions.targetFileNameRegex);
         const numFiles = files.length;
         appLogger.LogInfo("attempting to convert files", {
             numFiles,
         });
-        outputWriter.writeString(`attempting to convert ${numFiles} files`);
+        outputWriter.writeLine(`attempting to convert ${numFiles} files`);
         let i = 0;
         for (const f of files) {
             i++;
-            appLogger.LogDebug(`attempting to convert file ${i} of ${numFiles}`, {});
-            outputWriter.writeString(`attempting to convert file ${i} of ${numFiles}`);
+            const commandID = getConvertVideoCommandID();
+            appLogger.LogDebug(`attempting to convert file ${i} of ${numFiles}`, { commandID });
+            outputWriter.writeLine(`attempting to convert file ${i} of ${numFiles}`);
             const targetFileFullPath = getTargetFileFullPath(appLogger, f, appOptions);
-            const details = await ffmpegVideoConverter.convertVideo(f, {
-                commmandID: getConvertVideoCommandID(),
+            appLogger.LogDebug("attempting to get video file info so that we can calculate progressive updates", { commandID, })
+            const videoInfo = await ffmpegVideoConverter.getVideoInfo(f, {
+                commandID,
+                timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
+            })
+            const videoConvertOptions: VideoConvertOptions = {
+                commandID,
                 timeoutMilliseconds: CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS,
                 sourceFileFullPath: f.fullPath,
                 targetAudioEncoding: appOptions.targetAudioEncoder,
                 targetVideoEncoding: appOptions.targetVideoEncoder,
                 targetFileFullPath: targetFileFullPath,
-            });
-            totalRunTimeMilliseconds += details.duration;
-            totalSizeDifference += details.sizeDifference;
-            if (details.success) {
-                appLogger.LogVerbose(`converted file ${i} of ${numFiles}`, details);
-                outputWriter.writeString(`converted file ${i} of ${numFiles}`);
-                outputWriter.writeString(`source: ${f.fullPath} => target: ${targetFileFullPath}`)
+            }
+            appLogger.LogInfo("attempting to convert video", { file: f, commandID, videoConveryOptions: videoConvertOptions })
+            outputWriter.writeLine(`file: ${videoConvertOptions.sourceFileFullPath}`);
+            const convertPromise = ffmpegVideoConverter.convertVideo(f, videoConvertOptions);
+            const outputWriterSupportsProgressiveUpdates = outputWriter.supportsProgressiveUpdates() && videoInfo.success === true;
+            const outputHandler = (() => {
+                const videoStream: VideoStreamInfo | undefined = (videoInfo.videoInfo.streams.find(s => s.codec_type === "video") as VideoStreamInfo);
+                const numberOfFrames = videoStream?.nb_frames;
+                const numberOfFramesNumber = parseInt(numberOfFrames ?? "-1", 10);
+                appLogger.LogDebug("parsed out number of frames", { commandID, numberOfFrames, numberOfFramesNumber });
+                return (args: CommandStdErrMessageReceivedEventData) => {
+                    if (args.commandId == commandID && numberOfFramesNumber !== -1) {
+                        appLogger.LogDebug("constructing progressive update line", { commandID, message: args.message })
+                        // This is our current command we should do somthing with it?
+                        // TODO: implment write progressive line on output writer....
+                        const regexMatch = args.message.match(FFMPEG_CURRENT_FRAME_REGEX);
+                        const currentFrame = regexMatch?.groups?.framenumber;
+                        appLogger.LogDebug("current frame found", { commandID, currentFrame, numberOfFramesNumber })
+                        if (currentFrame) {
+                            const currentFrameNumber = parseInt(currentFrame, 10);
+                            const pctDone = Math.floor(currentFrameNumber / numberOfFramesNumber * 100);
+                            const numMarkers = Math.floor(pctDone / 5);
+                            appLogger.LogVerbose("found current frame", { commandID, numberOfFramesNumber, currentFrame, currentFrameNumber, pctDone, numMarkers });
+                            const arrow = `${"=".repeat(numMarkers ?? 0)}>`.padEnd(20, " ")
+                            const progressiveUpdate = `|${arrow}| %${pctDone}`.padEnd(PROGRESSIVE_UPDATE_CHAR_WIDTH, " ");
+                            outputWriter.write(`${progressiveUpdate}\r`);
+                        }
+                    }
+                }
+            })();
+            if (outputWriterSupportsProgressiveUpdates) {
+                ffmpegVideoConverter.on(VideoConverterEventName_StdErrMessageReceived, outputHandler)
+            }
+            const convertResult = await convertPromise
+            if (outputWriterSupportsProgressiveUpdates) {
+                ffmpegVideoConverter.off(VideoConverterEventName_StdErrMessageReceived, outputHandler)
+                // write an empty line to advance the progressive update line
+                outputWriter.writeLine("");
+            }
+            totalRunTimeMilliseconds += convertResult.duration;
+            totalSizeDifference += convertResult.sizeDifference;
+            if (convertResult.success) {
+                appLogger.LogVerbose(`converted file ${i} of ${numFiles}`, convertResult);
+                outputWriter.writeLine(`converted file ${i} of ${numFiles}`);
+                outputWriter.writeLine(`source: ${f.fullPath} => target: ${targetFileFullPath}`)
             } else {
-                appLogger.LogWarn(`failed to convert file ${i} of ${numFiles}`, details);
-                outputWriter.writeString(`failed to convert file ${i} of ${numFiles}`);
+                appLogger.LogWarn(`failed to convert file ${i} of ${numFiles}`, convertResult);
+                outputWriter.writeLine(`failed to convert file ${i} of ${numFiles}`);
             }
         }
         appLogger.LogInfo("video convert command finished", { totalRunTimeMilliseconds, totalSizeDifference });
-        outputWriter.writeString(`video convert command finished: total run time (ms) = ${totalRunTimeMilliseconds} - total size difference (bytes) = ${totalSizeDifference}`);
+        outputWriter.writeLine(`video convert command finished: total run time (ms) = ${totalRunTimeMilliseconds} - total size difference (bytes) = ${totalSizeDifference}`);
     }
 })().then(() => {
     // FIXME: make sure we are canceling any running jobs. handler interrupts like Ctrl+C?

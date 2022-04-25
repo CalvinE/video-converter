@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import { EventEmitter } from 'stream';
 import { setTimeout } from 'timers';
 import { ILogger } from '../Logger/Logger';
-import { CommandErroredEventData, CommandStateName_Errored, CommandFinishedEventData, CommandStateName_Finished, CommandMessageReceivedEventData, CommandRunningEventData, CommandStateName_Running, CommandStartedEventData, CommandStateName_Started, CommandState, CommandTimedoutEventData, CommandStateName_TimedOut } from './models';
+import { CommandErroredEventData, CommandStateName_Errored, CommandFinishedEventData, CommandStateName_Finished, CommandStdOutMessageReceivedEventData, CommandRunningEventData, CommandStateName_Running, CommandStartedEventData, CommandStateName_Started, CommandState, CommandTimedoutEventData, CommandStateName_TimedOut, CommandStdErrMessageReceivedEventData } from './models';
 
 export type CommandResult = {
     commandId: string,
@@ -41,7 +41,8 @@ export abstract class CommandRunner extends EventEmitter {
 
     protected abstract emitStarted(data: CommandStartedEventData): void;
     protected abstract emitRunning(data: CommandRunningEventData): void;
-    protected abstract emitMessageReceived(data: CommandMessageReceivedEventData): void;
+    protected abstract emitStdOutMessageReceived(data: CommandStdOutMessageReceivedEventData): void;
+    protected abstract emitStdErrMessageReceived(data: CommandStdErrMessageReceivedEventData): void;
     protected abstract emitFinished(data: CommandFinishedEventData): void;
     protected abstract emitErrored(data: CommandErroredEventData): void;
     protected abstract emitTimedout(data: CommandTimedoutEventData): void;
@@ -97,9 +98,9 @@ export abstract class CommandRunner extends EventEmitter {
                     pid: proc.pid,
                 };
                 this._logger.LogDebug("message received from command stderr", eventData)
-                // this.emitMessageReceived(eventData);
+                this.emitStdErrMessageReceived(eventData);
             });
-            
+
             proc.stdout.on("data", (chunk) => {
                 const currentMessage = chunk.toString();
                 commandOutput.push(currentMessage);
@@ -111,7 +112,7 @@ export abstract class CommandRunner extends EventEmitter {
                     pid: proc.pid,
                 };
                 this._logger.LogDebug("message received from command stdout", eventData)
-                this.emitMessageReceived(eventData);
+                this.emitStdOutMessageReceived(eventData);
             });
 
             // proc.on('message', (message) => {

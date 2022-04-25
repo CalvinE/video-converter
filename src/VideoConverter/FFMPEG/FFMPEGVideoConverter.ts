@@ -1,5 +1,5 @@
 import { IFileManager } from './../../FileManager';
-import { GetVideoInfoOptions, VideoGetInfoResult, VideoInfo } from './../models';
+import { CommandStdErrMessageReceivedEventData, GetVideoInfoOptions, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoInfo } from './../models';
 import { ILogger } from './../../Logger/Logger';
 import { FileInfo } from "../../FileManager";
 import { CommandRunner } from "../CommandRunner";
@@ -8,13 +8,13 @@ import {
     IVideoConverter,
     CommandStartedEventData,
     CommandRunningEventData,
-    CommandMessageReceivedEventData,
+    CommandStdOutMessageReceivedEventData,
     CommandFinishedEventData,
     CommandErroredEventData,
     CommandTimedoutEventData,
     VideoConverterEventName_Started,
     VideoConverterEventName_Running,
-    VideoConverterEventName_MessageReceived,
+    VideoConverterEventName_StdOutMessageReceived,
     VideoConverterEventName_Finished,
     VideoConverterEventName_Errored,
     VideoConverterEventName_Timedout,
@@ -54,8 +54,12 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this.emit(VideoConverterEventName_Running, data);
     }
 
-    protected emitMessageReceived(data: CommandMessageReceivedEventData) {
-        this.emit(VideoConverterEventName_MessageReceived, data);
+    protected emitStdOutMessageReceived(data: CommandStdOutMessageReceivedEventData) {
+        this.emit(VideoConverterEventName_StdOutMessageReceived, data);
+    }
+
+    protected emitStdErrMessageReceived(data: CommandStdErrMessageReceivedEventData) {
+        this.emit(VideoConverterEventName_StdErrMessageReceived, data);
     }
 
     protected emitFinished(data: CommandFinishedEventData) {
@@ -81,12 +85,12 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             "-show_streams",
             `"${sourceFile.fullPath}"`,
         ];
-        const commandResults = await this.executeCommand(this._ffprobeCommand, args, `GetVideoInfo-${options.commmandID}`, options.timeoutMilliseconds)
+        const commandResults = await this.executeCommand(this._ffprobeCommand, args, `GetVideoInfo-${options.commandID}`, options.timeoutMilliseconds)
         const joinedCommandOutput = commandResults.fullOutput.join("");
         const videoInfo: VideoInfo = JSON.parse(joinedCommandOutput);
         this._logger.LogVerbose("video info retreived", { videoInfo })
         return {
-            commandID: options.commmandID,
+            commandID: options.commandID,
             duration: commandResults.durationMilliseconds,
             size: sourceFile.size,
             sourceFileFullPath: sourceFile.fullPath,
@@ -108,11 +112,11 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             options.targetAudioEncoding,
             `"${options.targetFileFullPath}"`,
         ];
-        const commandResult = await this.executeCommand(this._ffmpegCommand, args, options.commmandID, options.timeoutMilliseconds);
+        const commandResult = await this.executeCommand(this._ffmpegCommand, args, options.commandID, options.timeoutMilliseconds);
         if (commandResult.success === true) {
             const targetFileInfo: FileInfo = (this._fileManager.getFSItemFromPath(options.targetFileFullPath) as FileInfo);
             return {
-                commandID: options.commmandID,
+                commandID: options.commandID,
                 duration: commandResult.durationMilliseconds,
                 success: commandResult.success,
                 sourceFileFullPath: sourceFile.fullPath,
@@ -121,7 +125,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             }
         }
         return {
-            commandID: options.commmandID,
+            commandID: options.commandID,
             duration: commandResult.durationMilliseconds,
             success: commandResult.success,
             sourceFileFullPath: sourceFile.fullPath,
