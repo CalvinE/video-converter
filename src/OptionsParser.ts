@@ -16,6 +16,7 @@ const COPY_RELATIVE_FOLDER_PATHS = "copyRelativeFolderPath";
 const SAVE_IN_PLACE = "saveInPlace";
 const GET_INFO_OPTION_NAME = "getInfo";
 const CONVERT_VIDEO_OPTION_NAME = "convertVideo"
+const X_ARG_OPTION_NAME = "xArg"
 const HELP_OPTION_NAME = "help";
 
 export type AppOptions = {
@@ -31,6 +32,7 @@ export type AppOptions = {
     [SAVE_IN_PLACE]: boolean;
     [GET_INFO_OPTION_NAME]: boolean;
     [CONVERT_VIDEO_OPTION_NAME]: boolean;
+    [X_ARG_OPTION_NAME]: string[];
     [HELP_OPTION_NAME]: boolean;
 }
 
@@ -49,6 +51,7 @@ export function ParseOptions(): AppOptions {
         copyRelativeFolderPath: false,
         getInfo: false,
         convertVideo: false,
+        xArg: [],
         help: false,
     };
     for (let i = 2; i < argv.length; i++) {
