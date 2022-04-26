@@ -96,7 +96,6 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this.emit(VideoConverterEventName_Timedout, data);
     }
 
-    // TODO: add command timeout parameter
     public async getVideoInfo(sourceFile: FileInfo, options: GetVideoInfoOptions): Promise<VideoGetInfoResult> {
         const args = [
             "-v",
@@ -106,8 +105,9 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             "-show_format",
             "-show_streams",
             `"${sourceFile.fullPath}"`,
+            ...options.xArgs,
         ];
-        const commandResults = await this.executeCommand(this._ffprobeCommand, args, `GetVideoInfo-${options.commandID}`, options.timeoutMilliseconds)
+        const commandResults = await this.executeCommand(this._ffprobeCommand, args, `GetVideoInfo-${options.commandID}`, options.timeoutMilliseconds);
         const joinedCommandOutput = commandResults.fullOutput.join("");
         const videoInfo: VideoInfo = JSON.parse(joinedCommandOutput);
         this._logger.LogVerbose("video info retreived", { videoInfo })
@@ -134,6 +134,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             "-c:a",
             options.targetAudioEncoding,
             `"${options.targetFileFullPath}"`,
+            ...options.xArgs,
         ];
         if (options.useCuda === true) {
             args.push("-hwaccel", "cuda", "-hwaccel_output_format", "cuda")

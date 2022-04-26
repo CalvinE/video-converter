@@ -45,6 +45,7 @@ export type CommandState = `${typeof CommandStateName_Pending | typeof CommandSt
 type BaseVideoConverterOptions = {
   commandID: string;
   timeoutMilliseconds: number;
+  xArgs: string[];
 };
 
 export type GetVideoInfoOptions = BaseVideoConverterOptions;

@@ -142,6 +142,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             const details = await ffmpegVideoConverter.getVideoInfo(f, {
                 commandID: getVideoInfoCommandID(),
                 timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
+                xArgs: appOptions.xArg,
             });
             if (details.success) {
                 appLogger.LogVerbose(`got info for file ${i++} of ${numFiles}`, details);
@@ -177,6 +178,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             const videoInfoResult = await ffmpegVideoConverter.getVideoInfo(f, {
                 commandID,
                 timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
+                xArgs: [],
             })
             if (videoInfoResult.success !== false) {
                 appLogger.LogWarn("failed to get video info", { videoInfoResult })
@@ -189,8 +191,9 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                 targetAudioEncoding: appOptions.targetAudioEncoder,
                 targetVideoEncoding: appOptions.targetVideoEncoder,
                 targetFileFullPath: targetFileFullPath,
+                xArgs: appOptions.xArg,
             }
-            appLogger.LogInfo("attempting to convert video", { file: f, commandID, videoConveryOptions: videoConvertOptions })
+            appLogger.LogInfo("attempting to convert video", { file: f, commandID, videoConvertOptions: videoConvertOptions })
             outputWriter.writeLine(`file: ${videoConvertOptions.sourceFileFullPath}`);
             const convertPromise = ffmpegVideoConverter.convertVideo(f, videoConvertOptions);
             const outputWriterSupportsProgressiveUpdates = outputWriter.supportsProgressiveUpdates() && videoInfoResult.success === true;
@@ -210,7 +213,6 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                         if (hasNumberOfFrames && outputWriterSupportsProgressiveUpdates) {
                             appLogger.LogDebug("constructing progressive update line", { commandID, message: args.commandMessage })
                             // This is our current command we should do somthing with it?
-                            // TODO: implment write progressive line on output writer....
                             const regexMatch = args.commandMessage.match(FFMPEG_CURRENT_FRAME_REGEX);
                             const currentFrame = regexMatch?.groups?.framenumber;
                             appLogger.LogDebug("current frame found", { commandID, currentFrame, numberOfFramesNumber })
@@ -250,9 +252,10 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                 appLogger.LogWarn(`failed to convert file ${i} of ${numFiles}`, convertResult);
                 outputWriter.writeLine(`failed to convert file ${i} of ${numFiles}`);
             }
+            outputWriter.writeLine("");
         }
-        appLogger.LogInfo("video convert command finished", { totalRunTimeMilliseconds: millisecondsToHHMMSS(totalRunTimeMilliseconds), totalSizeDifference: bytesToHumanReadableBytes(totalSizeDifference) });
-        outputWriter.writeLine(`video convert command finished: total run time (ms) = ${totalRunTimeMilliseconds} - total size reduction (bytes) = ${totalSizeDifference}`);
+        appLogger.LogInfo("video convert command finished", { totalRunTimeMilliseconds, prettyTotalRunTimeMilliseconds: millisecondsToHHMMSS(totalRunTimeMilliseconds), totalSizeDifference, prettyTotalSizeDifference: bytesToHumanReadableBytes(totalSizeDifference) });
+        outputWriter.writeLine(`video convert command finished: total run time = ${millisecondsToHHMMSS(totalRunTimeMilliseconds)} - total size reduction (bytes) = ${bytesToHumanReadableBytes(totalSizeDifference)}`);
     }
 })().then(() => {
     // FIXME: make sure we are canceling any running jobs. handler interrupts like Ctrl+C?

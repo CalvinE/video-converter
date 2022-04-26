@@ -17,7 +17,7 @@
 				"--timeout",
 				"999999999",
 				"--colors",
-				"${workspaceFolder}/test/**/*.test.ts"
+				"${workspaceFolder}/src/test/**/*.test.ts"
 			],
 			"internalConsoleOptions": "openOnSessionStart",
 			// "preLaunchTask": "Build required test docker containers",
@@ -40,7 +40,7 @@
 				".*\\.mp4",
 				"--getInfo",
 				"--sourcePath",
-				"F:\\Bob's Burgers\\Bob's Burgers Season 1"
+				"F:\\source"
 			],
 			"protocol": "inspector",
 		},
@@ -51,13 +51,15 @@
 			"program": "${workspaceFolder}/build/index.js",
 			"args": [
 				"--targetFileNameRegex",
-				".*\\.mp4",
+				".*\\.(mp4|mkv)",
 				"--convertVideo",
 				"--sourcePath",
-				"F:\\Bob's Burgers",
+				"F:\\source",
 				"--targetVideoEncoder",
 				"libx265",
 				"--copyRelativeFolderPath",
+				"--savePath",
+				"F:\\result"
 			],
 			"protocol": "inspector",
 		}, // libx265
