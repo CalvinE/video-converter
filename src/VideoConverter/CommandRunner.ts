@@ -2,11 +2,13 @@ import { spawn } from 'child_process';
 import { EventEmitter } from 'stream';
 import { setTimeout } from 'timers';
 import { ILogger } from '../Logger/Logger';
-import { CommandErroredEventData, CommandStateName_Errored, CommandFinishedEventData, CommandStateName_Finished, CommandStdOutMessageReceivedEventData, CommandRunningEventData, CommandStateName_Running, CommandStartedEventData, CommandStateName_Started, CommandState, CommandTimedoutEventData, CommandStateName_TimedOut, CommandStdErrMessageReceivedEventData } from './models';
+import { millisecondsToHHMMSS } from '../PrettyPrint';
+import { CommandErroredEventData, CommandStateName_Errored, CommandFinishedEventData, CommandStateName_Finished, CommandStdOutMessageReceivedEventData, CommandRunningEventData, CommandStateName_Running, CommandStartedEventData, CommandStateName_Started, CommandState, CommandTimedoutEventData, CommandStateName_TimedOut, CommandStdErrMessageReceivedEventData, CommandCheckResult } from './models';
 
 export type CommandResult = {
     commandId: string,
     durationMilliseconds: number;
+    durationPretty: string;
     error?: Error;
     exitCode?: number
     fullOutput: string[];
@@ -37,7 +39,7 @@ export abstract class CommandRunner extends EventEmitter {
         this._logger = logger;
     }
 
-    public abstract checkCommand(args: string[]): Promise<boolean>;
+    public abstract checkCommands(): Promise<CommandCheckResult>;
 
     protected abstract emitStarted(data: CommandStartedEventData): void;
     protected abstract emitRunning(data: CommandRunningEventData): void;
@@ -67,6 +69,7 @@ export abstract class CommandRunner extends EventEmitter {
                 commandId,
                 currentState,
                 elapsedTimeMilliseconds: this.getElapsedTimeMillseconds(startTimestampMilliseconds),
+                elapsedTimePretty: millisecondsToHHMMSS(this.getElapsedTimeMillseconds(startTimestampMilliseconds)),
                 pid: proc.pid,
             };
             this._logger.LogDebug("starting command", eventData)
@@ -75,10 +78,12 @@ export abstract class CommandRunner extends EventEmitter {
             proc.on('spawn', () => {
                 // The process has started: https://nodejs.org/api/child_process.html#event-spawn
                 currentState = CommandStateName_Running;
+                const elapsedTimeMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
                 const eventData = {
                     commandId,
                     currentState,
-                    elapsedTimeMilliseconds: this.getElapsedTimeMillseconds(startTimestampMilliseconds),
+                    elapsedTimeMilliseconds,
+                    elapsedTimePretty: millisecondsToHHMMSS(elapsedTimeMilliseconds),
                     pid: proc.pid,
                 };
                 this._logger.LogDebug("command process spawned", eventData)
@@ -90,11 +95,13 @@ export abstract class CommandRunner extends EventEmitter {
             proc.stderr.on("data", (chunk) => {
                 const currentMessage = chunk.toString();
                 commandStdErrOutput.push(currentMessage);
-                const eventData = {
+                const elapsedTimeMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
+                const eventData: CommandStdErrMessageReceivedEventData = {
                     commandId,
+                    commandMessage: currentMessage,
                     currentState,
-                    elapsedTimeMilliseconds: this.getElapsedTimeMillseconds(startTimestampMilliseconds),
-                    message: currentMessage,
+                    elapsedTimeMilliseconds,
+                    elapsedTimePretty: millisecondsToHHMMSS(elapsedTimeMilliseconds),
                     pid: proc.pid,
                 };
                 this._logger.LogDebug("message received from command stderr", eventData)
@@ -104,11 +111,13 @@ export abstract class CommandRunner extends EventEmitter {
             proc.stdout.on("data", (chunk) => {
                 const currentMessage = chunk.toString();
                 commandOutput.push(currentMessage);
-                const eventData = {
+                const elapsedTimeMilliseconds = this.getElapsedTimeMillseconds(startTimestampMilliseconds);
+                const eventData: CommandStdOutMessageReceivedEventData = {
                     commandId,
+                    commandMessage: currentMessage,
                     currentState,
-                    elapsedTimeMilliseconds: this.getElapsedTimeMillseconds(startTimestampMilliseconds),
-                    message: currentMessage,
+                    elapsedTimeMilliseconds,
+                    elapsedTimePretty: millisecondsToHHMMSS(elapsedTimeMilliseconds),
                     pid: proc.pid,
                 };
                 this._logger.LogDebug("message received from command stdout", eventData)
@@ -138,6 +147,7 @@ export abstract class CommandRunner extends EventEmitter {
                     commandId,
                     currentState,
                     elapsedTimeMilliseconds: durationMilliseconds,
+                    elapsedTimePretty: millisecondsToHHMMSS(durationMilliseconds),
                     error: err,
                     pid: proc.pid,
                 };
@@ -146,6 +156,7 @@ export abstract class CommandRunner extends EventEmitter {
                 resolve({
                     commandId,
                     durationMilliseconds,
+                    durationPretty: millisecondsToHHMMSS(durationMilliseconds),
                     fullOutput: commandOutput,
                     fullStdErrOutput: commandStdErrOutput,
                     success: false,
@@ -164,6 +175,7 @@ export abstract class CommandRunner extends EventEmitter {
                         commandId,
                         currentState,
                         elapsedTimeMilliseconds: durationMilliseconds,
+                        elapsedTimePretty: millisecondsToHHMMSS(durationMilliseconds),
                         fullOutput: commandOutput,
                         pid: proc.pid,
                     };
@@ -172,6 +184,7 @@ export abstract class CommandRunner extends EventEmitter {
                     resolve({
                         commandId,
                         durationMilliseconds,
+                        durationPretty: millisecondsToHHMMSS(durationMilliseconds),
                         fullOutput: commandOutput,
                         fullStdErrOutput: commandStdErrOutput,
                         success: code === 0,
@@ -233,7 +246,8 @@ export abstract class CommandRunner extends EventEmitter {
                         const eventData = {
                             commandId,
                             currentState,
-                            elapsedTimeMilliseconds: this.getElapsedTimeMillseconds(startTimestampMilliseconds),
+                            elapsedTimeMilliseconds: durationMilliseconds,
+                            elapsedTimePretty: millisecondsToHHMMSS(durationMilliseconds),
                             pid: proc.pid,
                             timeoutMilliseconds: timeoutMilliseconds
                         };
@@ -243,6 +257,7 @@ export abstract class CommandRunner extends EventEmitter {
                         resolve({
                             commandId,
                             durationMilliseconds,
+                            durationPretty: millisecondsToHHMMSS(durationMilliseconds),
                             error: err,
                             fullOutput: commandOutput,
                             fullStdErrOutput: commandStdErrOutput,

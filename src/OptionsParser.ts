@@ -2,7 +2,10 @@ import { VideoContainerFormat, AudioEncoder, VideoEncoder, INVALID } from './Vid
 import { argv, stdout } from "process";
 import { EOL } from 'os';
 
+const DEFAULT_APPROVED_FILE_EXTENSIONS: string[] = ["mp4", "mkv", "avi", "mov"];
+
 const SOURCE_PATH_OPTION_NAME = "sourcePath";
+const ALLOWED_FILE_EXTENSIONS_OPTION_NAME = "allowFileExtensions";
 const TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME = "targetContainerFormat";
 const TARGET_AUDIO_ENCODER_PATH_OPTION_NAME = "targetAudioEncoder";
 const TARGET_VIDEO_ENCODER_PATH_OPTION_NAME = "targetVideoEncoder";
@@ -16,6 +19,7 @@ const HELP_OPTION_NAME = "help";
 
 export type AppOptions = {
     [SOURCE_PATH_OPTION_NAME]: string;
+    [ALLOWED_FILE_EXTENSIONS_OPTION_NAME]: string[];
     [TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME]: VideoContainerFormat;
     [TARGET_AUDIO_ENCODER_PATH_OPTION_NAME]: AudioEncoder;
     [TARGET_VIDEO_ENCODER_PATH_OPTION_NAME]: VideoEncoder;
@@ -33,6 +37,7 @@ export function ParseOptions(): AppOptions {
     // Initialize with defaults
     const options: AppOptions = {
         sourcePath: "",
+        allowFileExtensions: DEFAULT_APPROVED_FILE_EXTENSIONS,
         targetContainerFormat: "copy",
         targetAudioEncoder: "copy",
         targetVideoEncoder: "copy",
@@ -51,6 +56,19 @@ export function ParseOptions(): AppOptions {
                 break;
             case SOURCE_PATH_OPTION_NAME:
                 options[SOURCE_PATH_OPTION_NAME] = argv[++i] ?? "";
+                break;
+            case ALLOWED_FILE_EXTENSIONS_OPTION_NAME:
+                // eslint-disable-next-line no-case-declarations
+                const extension = argv[++i] ?? "";
+                if (extension.length > 0) {
+                    options[ALLOWED_FILE_EXTENSIONS_OPTION_NAME] = extension.split(",")
+                } else {
+                    stdout.write(`${ALLOWED_FILE_EXTENSIONS_OPTION_NAME} cannot be empty: ${extension}${EOL}`);
+                    return {
+                        ...options,
+                        help: true
+                    }
+                }
                 break;
             case TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME:
                 options[TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME] = (argv[++i] as VideoContainerFormat) ?? INVALID;
@@ -83,7 +101,7 @@ export function ParseOptions(): AppOptions {
             default:
                 // If we get here we did somthing wrong... print help and return?
                 // FIXME: abstract how this is output?
-                stdout.write(`invalid arg provided: ${argv[i]}${EOL}`)
+                stdout.write(`invalid arg provided: ${argv[i]}${EOL}`);
                 return {
                     ...options,
                     help: true, // force help to true so help text also prints...

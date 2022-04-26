@@ -59,14 +59,36 @@ export type VideoConvertOptions = BaseVideoConverterOptions & {
 type BaseVideoConverterResult = {
   commandID: string;
   duration: number;
+  durationPretty: string;
   success: boolean;
+}
+
+export type CommandCheckResult = BaseVideoConverterResult & {
+  results: Array<{
+    command: string,
+    args: string[],
+    success: boolean,
+  }>;
+}
+
+export type VideoGetInfoResult = BaseVideoConverterResult & {
+  size: number;
+  videoInfo: VideoInfo;
   sourceFileFullPath: string;
 }
+
+export type VideoConvertResult = BaseVideoConverterResult & {
+  targetFileFullPath: string;
+  sizeDifference: number;
+  sizeDifferencePretty: string;
+  sourceFileFullPath: string;
+};
 
 type BaseVideoConverterEvent = {
   commandId: string;
   currentState: CommandState;
-  elapsedTimeMilliseconds: number
+  elapsedTimeMilliseconds: number;
+  elapsedTimePretty: string;
   pid?: number;
 }
 
@@ -75,7 +97,7 @@ export type CommandStartedEventData = BaseVideoConverterEvent;
 export type CommandRunningEventData = BaseVideoConverterEvent;
 
 export type CommandStdOutMessageReceivedEventData = BaseVideoConverterEvent & {
-  message: string;
+  commandMessage: string;
 };
 
 export type CommandStdErrMessageReceivedEventData = CommandStdOutMessageReceivedEventData;
@@ -94,15 +116,6 @@ export type CommandTimedoutEventData = BaseVideoConverterEvent & {
   timeoutMilliseconds: number;
 };
 
-export type VideoGetInfoResult = BaseVideoConverterResult & {
-  size: number;
-  videoInfo: VideoInfo;
-}
-
-export type VideoConvertResult = BaseVideoConverterResult & {
-  targetFileFullPath: string;
-  sizeDifference: number;
-};
 
 export interface IVideoConverter {
   getVideoInfo: (sourceFile: FileInfo, options: GetVideoInfoOptions) => Promise<VideoGetInfoResult>;

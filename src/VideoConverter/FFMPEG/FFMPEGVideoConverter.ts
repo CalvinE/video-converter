@@ -1,5 +1,5 @@
 import { IFileManager } from './../../FileManager';
-import { CommandStdErrMessageReceivedEventData, GetVideoInfoOptions, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoInfo } from './../models';
+import { CommandCheckResult, CommandStdErrMessageReceivedEventData, GetVideoInfoOptions, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoInfo } from './../models';
 import { ILogger } from './../../Logger/Logger';
 import { FileInfo } from "../../FileManager";
 import { CommandRunner } from "../CommandRunner";
@@ -21,6 +21,7 @@ import {
     VideoConvertResult,
 } from "../models";
 import { dirname } from 'path';
+import { bytesToHumanReadableBytes, millisecondsToHHMMSS } from '../../PrettyPrint';
 
 export class FFMPEGVideoConverter extends CommandRunner implements IVideoConverter {
 
@@ -37,13 +38,34 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    public override async checkCommand(_: string[]): Promise<boolean> {
-        this._logger.LogDebug("checking to see if command can be run.", { command: this._ffmpegCommand })
-        const ffmpegResult = await this.executeCommand(this._ffmpegCommand, ["-h"], "test-ffmpeg", 10000000);
-        this._logger.LogDebug("finished check of command", ffmpegResult);
-        const ffProbeResult = await this.executeCommand(this._ffprobeCommand, ["-L"], "test-ffprobe", 10000000);
-        this._logger.LogDebug("finished check of command", ffProbeResult);
-        return ffmpegResult?.success === true && ffProbeResult?.success === true
+    public override async checkCommands(): Promise<CommandCheckResult> {
+        this._logger.LogVerbose("checking to see if command can be run.", { command: this._ffmpegCommand });
+        const checkCommandsCommandID = "checkCommands";
+        const ffmpegArgs = ["-h"];
+        const ffmpegResult = await this.executeCommand(this._ffmpegCommand, ffmpegArgs, checkCommandsCommandID, 10000000);
+        this._logger.LogVerbose("finished check of command", ffmpegResult);
+        const ffprobeArgs = ["-L"];
+        const ffprobeResult = await this.executeCommand(this._ffprobeCommand, ffprobeArgs, checkCommandsCommandID, 10000000);
+        this._logger.LogVerbose("finished check of command", ffprobeResult);
+        const duration = ffmpegResult.durationMilliseconds + ffprobeResult.durationMilliseconds;
+        return {
+            commandID: checkCommandsCommandID,
+            success: ffmpegResult.success === true && ffprobeResult.success === true,
+            duration: duration,
+            durationPretty: millisecondsToHHMMSS(duration),
+            results: [
+                {
+                    command: this._ffmpegCommand,
+                    args: ffmpegArgs,
+                    success: ffmpegResult.success,
+                },
+                {
+                    command: this._ffprobeCommand,
+                    args: ffprobeArgs,
+                    success: ffprobeResult.success,
+                },
+            ],
+        }
     }
 
     protected override emitStarted(data: CommandStartedEventData) {
@@ -92,6 +114,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         return {
             commandID: options.commandID,
             duration: commandResults.durationMilliseconds,
+            durationPretty: millisecondsToHHMMSS(commandResults.durationMilliseconds),
             size: sourceFile.size,
             sourceFileFullPath: sourceFile.fullPath,
             success: commandResults.success,
@@ -115,22 +138,27 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         const commandResult = await this.executeCommand(this._ffmpegCommand, args, options.commandID, options.timeoutMilliseconds);
         if (commandResult.success === true) {
             const targetFileInfo: FileInfo = (this._fileManager.getFSItemFromPath(options.targetFileFullPath) as FileInfo);
+            const sizeDiff = sourceFile.size - targetFileInfo.size;
             return {
                 commandID: options.commandID,
                 duration: commandResult.durationMilliseconds,
+                durationPretty: millisecondsToHHMMSS(commandResult.durationMilliseconds),
                 success: commandResult.success,
                 sourceFileFullPath: sourceFile.fullPath,
                 targetFileFullPath: options.targetFileFullPath,
-                sizeDifference: sourceFile.size - targetFileInfo.size,
+                sizeDifference: sizeDiff,
+                sizeDifferencePretty: bytesToHumanReadableBytes(sizeDiff),
             }
         }
         return {
             commandID: options.commandID,
             duration: commandResult.durationMilliseconds,
+            durationPretty: millisecondsToHHMMSS(commandResult.durationMilliseconds),
             success: commandResult.success,
             sourceFileFullPath: sourceFile.fullPath,
             targetFileFullPath: options.targetFileFullPath,
             sizeDifference: 0,
+            sizeDifferencePretty: bytesToHumanReadableBytes(0),
         }
     }
 }

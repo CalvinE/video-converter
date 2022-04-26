@@ -1,3 +1,5 @@
+import { NoopLogger } from './../Logger/NoopLogger';
+import { ILogger } from './../Logger/Logger';
 import { join } from 'path';
 import { FileManager, IFileManager } from '../FileManager';
 import { assert } from 'chai';
@@ -9,16 +11,18 @@ const mkdirTestFolder = join(testFolderPath, "a_temp_dir");
 
 describe('FileManager tests', () => {
     describe('enumerateDirectory', () => {
-        let fileCrawler: IFileManager
+        let logger: ILogger;
+        let fileManager: IFileManager
         before(() => {
-            fileCrawler = new FileManager();
+            logger = new NoopLogger('debug');
+            fileManager = new FileManager(logger);
         });
         it('Should enumerate a directory at a single level when max recursion level is 0 or less', () => {
-            const dirContents = fileCrawler.enumerateDirectory(testFolderPath)
+            const dirContents = fileManager.enumerateDirectory(testFolderPath)
             assert.equal(dirContents.length, 2)
         });
         it('Should populate file extension on FIleInfo.', () => {
-            const dirContents = fileCrawler.enumerateDirectory(testFolderPath)
+            const dirContents = fileManager.enumerateDirectory(testFolderPath)
             assert.equal(dirContents.length, 2)
             if (dirContents[1].type === 'file') {
                 assert.equal(dirContents[1].extension, ".txt");
@@ -27,7 +31,7 @@ describe('FileManager tests', () => {
             }
         });
         it('Should enumerate a directory recursivly when max recursion level is 1 or greater', () => {
-            const dirContents = fileCrawler.enumerateDirectory(testFolderPath, 99)            
+            const dirContents = fileManager.enumerateDirectory(testFolderPath, 99)
             assert.equal(dirContents.length, 2)
             if (dirContents[0].type === 'directory') {
                 assert.equal(dirContents[0].files.length, 1)
@@ -37,9 +41,11 @@ describe('FileManager tests', () => {
         });
     });
     describe('makeDir', () => {
-        let fileCrawler: IFileManager
+        let logger: ILogger;
+        let fileManager: IFileManager
         before(() => {
-            fileCrawler = new FileManager();
+            logger = new NoopLogger('debug');
+            fileManager = new FileManager(logger);
         });
         after(() => {
             rmSync(mkdirTestFolder, {
@@ -47,8 +53,8 @@ describe('FileManager tests', () => {
             })
         });
         it('Should create a directory where asked', () => {
-            const success = fileCrawler.makeDir(mkdirTestFolder)
+            const success = fileManager.makeDir(mkdirTestFolder)
             assert.isTrue(success);
-        },);
+        });
     });
 });
