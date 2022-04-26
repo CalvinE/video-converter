@@ -135,6 +135,9 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             options.targetAudioEncoding,
             `"${options.targetFileFullPath}"`,
         ];
+        if (options.useCuda === true) {
+            args.push("-hwaccel", "cuda", "-hwaccel_output_format", "cuda")
+        }
         const commandResult = await this.executeCommand(this._ffmpegCommand, args, options.commandID, options.timeoutMilliseconds);
         if (commandResult.success === true) {
             const targetFileInfo: FileInfo = (this._fileManager.getFSItemFromPath(options.targetFileFullPath) as FileInfo);

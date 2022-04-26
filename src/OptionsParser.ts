@@ -5,6 +5,7 @@ import { EOL } from 'os';
 const DEFAULT_APPROVED_FILE_EXTENSIONS: string[] = ["mp4", "mkv", "avi", "mov"];
 
 const SOURCE_PATH_OPTION_NAME = "sourcePath";
+const USE_CUDA_OPTION_NAME = "useCuda";
 const ALLOWED_FILE_EXTENSIONS_OPTION_NAME = "allowFileExtensions";
 const TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME = "targetContainerFormat";
 const TARGET_AUDIO_ENCODER_PATH_OPTION_NAME = "targetAudioEncoder";
@@ -19,6 +20,7 @@ const HELP_OPTION_NAME = "help";
 
 export type AppOptions = {
     [SOURCE_PATH_OPTION_NAME]: string;
+    [USE_CUDA_OPTION_NAME]: boolean;
     [ALLOWED_FILE_EXTENSIONS_OPTION_NAME]: string[];
     [TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME]: VideoContainerFormat;
     [TARGET_AUDIO_ENCODER_PATH_OPTION_NAME]: AudioEncoder;
@@ -37,6 +39,7 @@ export function ParseOptions(): AppOptions {
     // Initialize with defaults
     const options: AppOptions = {
         sourcePath: "",
+        useCuda: false,
         allowFileExtensions: DEFAULT_APPROVED_FILE_EXTENSIONS,
         targetContainerFormat: "copy",
         targetAudioEncoder: "copy",
@@ -56,6 +59,9 @@ export function ParseOptions(): AppOptions {
                 break;
             case SOURCE_PATH_OPTION_NAME:
                 options[SOURCE_PATH_OPTION_NAME] = argv[++i] ?? "";
+                break;
+            case USE_CUDA_OPTION_NAME:
+                options[USE_CUDA_OPTION_NAME] = true;
                 break;
             case ALLOWED_FILE_EXTENSIONS_OPTION_NAME:
                 // eslint-disable-next-line no-case-declarations

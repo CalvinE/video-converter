@@ -50,6 +50,7 @@ type BaseVideoConverterOptions = {
 export type GetVideoInfoOptions = BaseVideoConverterOptions;
 
 export type VideoConvertOptions = BaseVideoConverterOptions & {
+  useCuda: boolean;
   sourceFileFullPath: string;
   targetFileFullPath: string;
   targetVideoEncoding: VideoEncoder;

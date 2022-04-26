@@ -183,6 +183,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             }
             const videoConvertOptions: VideoConvertOptions = {
                 commandID,
+                useCuda: appOptions.useCuda,
                 timeoutMilliseconds: CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS,
                 sourceFileFullPath: f.fullPath,
                 targetAudioEncoding: appOptions.targetAudioEncoder,
