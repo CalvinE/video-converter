@@ -104,8 +104,8 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             "json",
             "-show_format",
             "-show_streams",
-            `"${sourceFile.fullPath}"`,
             ...options.xArgs,
+            `"${sourceFile.fullPath}"`,
         ];
         const commandResults = await this.executeCommand(this._ffprobeCommand, args, `GetVideoInfo-${options.commandID}`, options.timeoutMilliseconds);
         const joinedCommandOutput = commandResults.fullOutput.join("");
@@ -133,8 +133,8 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             options.targetVideoEncoding,
             "-c:a",
             options.targetAudioEncoding,
-            `"${options.targetFileFullPath}"`,
             ...options.xArgs,
+            `"${options.targetFileFullPath}"`,
         ];
         if (options.useCuda === true) {
             args.push("-hwaccel", "cuda", "-hwaccel_output_format", "cuda")
