@@ -1,12 +1,12 @@
 import { ILogger } from './Logger/Logger';
-import path from 'path';
-import fs from 'fs';
+import { basename, dirname, extname, join, relative, resolve } from 'path';
+import fs, { copyFileSync, existsSync, lstatSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 
 type BaseFSItem = {
     fullPath: string;
     name: string;
     pathToItem: string;
-    relativepath: string;
+    relativePath: string;
 }
 
 export type FileInfo = BaseFSItem & {
@@ -30,13 +30,24 @@ export interface IFileManager {
      */
     enumerateDirectory: (directory: string, maxRecursiveDepth?: number) => FSItem[]
     /**
-     * @description Will create a directory (recursivly if necessary).
+     * @description Will create a directory (recursively if necessary).
      * @param targetDir string The path to create a directory.
      * @returns boolean value. if true then the directory was created or already existed.
      */
     makeDir: (targetDir: string) => boolean
 
     getFSItemFromPath: (itemPath: string) => FSItem
+
+    // TODO: need to make a proper result for the return value.
+    copyFile: (sourceFileFullPath: string, targetPath: string) => boolean;
+
+    readFile: (sourceFilePath: string) => string;
+
+    writeFile: (targetFileFullPath: string, content: string, truncate: boolean) => void;
+
+    safeUnlinkFile: (targetFileFullPath: string) => void;
+
+    unlinkFile: (targetFileFullPath: string) => void;
 }
 
 class ErrorDirectoryDoesNotExist extends Error {
@@ -53,12 +64,84 @@ class ErrorIsNotDirectory extends Error {
     }
 }
 
+class ErrorIsNotFile extends Error {
+    static ErrorName = "IsNotFile";
+    constructor(item: string) {
+        super(`item exists and is not a file: ${item}`)
+    }
+}
+
+class ErrorItemDoesNotExist extends Error {
+    static ErrorName = "ItemDoesNotExist";
+    constructor(item: string) {
+        super(`item does not exist: ${item}`)
+    }
+}
+
 export class FileManager implements IFileManager {
     private _logger: ILogger;
 
     constructor(logger: ILogger) {
         this._logger = logger;
     }
+
+    public unlinkFile(targetFileFullPath: string) {
+        unlinkSync(targetFileFullPath)
+    }
+
+    public safeUnlinkFile(targetFileFullPath: string) {
+        try {
+            this.unlinkFile(targetFileFullPath)
+        } catch (error) {
+            this._logger.LogWarn("unable to unlink file", { error })
+        }
+    }
+
+    public writeFile(targetFilePath: string, content: string, truncate: boolean): void {
+        const targetFileFullPath = resolve(targetFilePath);
+        const targetFileParentDirectory = dirname(targetFileFullPath);
+        if (!existsSync(targetFileParentDirectory)) {
+            this.makeDir(targetFileParentDirectory);
+        }
+        writeFileSync(targetFileFullPath, content, {
+            encoding: "utf8",
+            flag: truncate === true ? "w" : "a",
+        });
+    }
+
+    public readFile(sourceFilePath: string): string {
+        if (!existsSync(sourceFilePath)) {
+            throw new ErrorItemDoesNotExist(sourceFilePath);
+        }
+        const fileStats = lstatSync(sourceFilePath);
+        if (!fileStats.isFile()) {
+            throw new ErrorIsNotFile(sourceFilePath);
+        }
+        const content = readFileSync(sourceFilePath, {
+            encoding: "utf8",
+        });
+        return content;
+    }
+
+    public copyFile(sourceFileFullPath: string, targetFileFullPath: string): boolean {
+        if (!existsSync(sourceFileFullPath)) {
+            throw new ErrorItemDoesNotExist(sourceFileFullPath);
+        }
+        const stats = lstatSync(sourceFileFullPath);
+        if (stats.isDirectory()) {
+            throw new ErrorIsNotFile(sourceFileFullPath);
+        }
+        const targetFileParentDir = dirname(targetFileFullPath);
+        if (!existsSync(targetFileParentDir)) {
+            const wasMade = this.makeDir(targetFileParentDir);
+            if (!wasMade) {
+                throw new ErrorDirectoryDoesNotExist(targetFileParentDir);
+            }
+        }
+        copyFileSync(sourceFileFullPath, targetFileFullPath);
+        return true; //???
+    }
+
 
     public makeDir(targetDir: string): boolean {
         let success = false;
@@ -102,11 +185,11 @@ export class FileManager implements IFileManager {
         this._logger.LogDebug("found contents of directory", { directory, numItems: contents.length, maxRecursiveDepth });
         // if recursive loop over stuff and go in directories
         for (const item of contents) {
-            const itemPath: string = path.join(itemInfo.fullPath, item)
+            const itemPath: string = join(itemInfo.fullPath, item)
             this._logger.LogVerbose("getting info on specific item", { file: item });
             const fsItem = this.getFSItemFromPath(itemPath, originalDirectory ?? directory);
-            this._logger.LogVerbose("file info aquired", { fsItem })
-            // This feels weird, but my thought is if you pass -1 or somthing then go recursive all the way?
+            this._logger.LogVerbose("file info acquired", { fsItem })
+            // This feels weird, but my thought is if you pass -1 or something then go recursive all the way?
             if (maxRecursiveDepth != 0) {
                 if (fsItem.type === 'directory') {
                     this._logger.LogVerbose("recursing into directory", { fsItem, maxRecursiveDepth });
@@ -133,17 +216,17 @@ export class FileManager implements IFileManager {
                 ...baseFSInfo,
                 type: 'file',
                 size: stats.size,
-                extension: path.extname(itemPath).toLowerCase(),
+                extension: extname(itemPath).toLowerCase(),
             }
         }
     }
 
     private getBaseFSInfoFromPath(itemPath: string, basePath: string): BaseFSItem {
         const baseFSItem: BaseFSItem = {
-            fullPath: path.resolve(itemPath),
-            name: path.basename(itemPath),
-            pathToItem: path.dirname(itemPath),
-            relativepath: path.dirname(path.relative(basePath, itemPath)),
+            fullPath: resolve(itemPath),
+            name: basename(itemPath),
+            pathToItem: dirname(itemPath),
+            relativePath: dirname(relative(basePath, itemPath)),
         }
         return baseFSItem;
     }

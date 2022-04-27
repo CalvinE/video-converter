@@ -28,4 +28,4 @@ RUN npm install
 RUN npm run build
 
 # node .\build\index.js --targetFileNameRegex .*\.mp4 --convertVideo --sourcePath "F:\Bob's Burgers\Bob's Burgers Season 1" --targetVideoEncoder libx265 --copyRelativeFolderPath --savePath ".\oother-test"
-ENTRYPOINT [ "/root/.nvm/versions/node/v16.14.2/bin/node", "./build/index.js", "--convertVideo", "--sourcePath", "/source", "--targetVideoEncoder", "libx265", "--copyRelativeFolderPath", "--savePath", "/result" ]
+ENTRYPOINT [ "/root/.nvm/versions/node/v16.14.2/bin/node", "./build/index.js", "--convertVideo", "--sourcePath", "/source", "--targetVideoEncoder", "libx265", "--copyRelativeFolderPath", "--savePath", "/result", "--fileCopyExtensions", ".jpg,.srt" ]

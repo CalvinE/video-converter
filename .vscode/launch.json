@@ -50,8 +50,6 @@
 			"name": "Test ConvertVideo",
 			"program": "${workspaceFolder}/build/index.js",
 			"args": [
-				"--targetFileNameRegex",
-				".*\\.(mp4|mkv)",
 				"--convertVideo",
 				"--sourcePath",
 				"F:\\source",
@@ -59,7 +57,9 @@
 				"libx265",
 				"--copyRelativeFolderPath",
 				"--savePath",
-				"F:\\result"
+				"D:\\result",
+				"--fileCopyExtensions",
+				".jpg,.srt"
 			],
 			"protocol": "inspector",
 		}, // libx265

@@ -2,11 +2,14 @@ import { VideoContainerFormat, AudioEncoder, VideoEncoder, INVALID } from './Vid
 import { argv, stdout } from "process";
 import { EOL } from "os";
 
-const DEFAULT_APPROVED_FILE_EXTENSIONS: string[] = ["mp4", "mkv", "avi", "mov"];
+const DEFAULT_APPROVED_FILE_EXTENSIONS: string[] = [".mp4", ".mkv", ".avi", ".mov"];
+// const DEFAULT_FILES_TO_COPY: string[] = [".jpg", ".srt"];
 
 const SOURCE_PATH_OPTION_NAME = "sourcePath";
 const USE_CUDA_OPTION_NAME = "useCuda";
-const ALLOWED_FILE_EXTENSIONS_OPTION_NAME = "allowFileExtensions";
+const ALLOWED_FILE_EXTENSIONS_OPTION_NAME = "allowedFileExtensions";
+const FILES_TO_COPY_REGEX_OPTION_NAME = "fileCopyRegex";
+const FILES_TO_COPY_EXTENSIONS_OPTION_NAME = "fileCopyExtensions";
 const TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME = "targetContainerFormat";
 const TARGET_AUDIO_ENCODER_PATH_OPTION_NAME = "targetAudioEncoder";
 const TARGET_VIDEO_ENCODER_PATH_OPTION_NAME = "targetVideoEncoder";
@@ -15,12 +18,16 @@ const SAVE_PATH_OPTION_NAME = "savePath";
 const COPY_RELATIVE_FOLDER_PATHS = "copyRelativeFolderPath";
 const SAVE_IN_PLACE = "saveInPlace";
 const GET_INFO_OPTION_NAME = "getInfo";
-const CONVERT_VIDEO_OPTION_NAME = "convertVideo"
+const CONVERT_VIDEO_OPTION_NAME = "convertVideo";
+const SAVE_JOB_FILE_OPTION_NAME = "saveJobFile";
+const READ_JOB_FILE_OPTION_NAME = "jobFile";
 const X_ARGS_OPTION_NAME = "xArgs"
 const HELP_OPTION_NAME = "help";
 
 export type AppOptions = {
     [SOURCE_PATH_OPTION_NAME]: string;
+    [FILES_TO_COPY_REGEX_OPTION_NAME]?: RegExp;
+    [FILES_TO_COPY_EXTENSIONS_OPTION_NAME]: string[];
     [USE_CUDA_OPTION_NAME]: boolean;
     [ALLOWED_FILE_EXTENSIONS_OPTION_NAME]: string[];
     [TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME]: VideoContainerFormat;
@@ -32,6 +39,8 @@ export type AppOptions = {
     [SAVE_IN_PLACE]: boolean;
     [GET_INFO_OPTION_NAME]: boolean;
     [CONVERT_VIDEO_OPTION_NAME]: boolean;
+    [SAVE_JOB_FILE_OPTION_NAME]: string;
+    [READ_JOB_FILE_OPTION_NAME]: string;
     [X_ARGS_OPTION_NAME]: string[];
     [HELP_OPTION_NAME]: boolean;
 }
@@ -44,13 +53,14 @@ function safeQuoteXArg(arg: string): string {
     return sarg;
 }
 
-// cmd options are passed with preceeding 2 dahses EX: --help
+// cmd options are passed with preceding 2 dahses EX: --help
 export function ParseOptions(): AppOptions {
     // Initialize with defaults
     const options: AppOptions = {
         sourcePath: "",
         useCuda: false,
-        allowFileExtensions: DEFAULT_APPROVED_FILE_EXTENSIONS,
+        fileCopyExtensions: [],
+        allowedFileExtensions: DEFAULT_APPROVED_FILE_EXTENSIONS,
         targetContainerFormat: "copy",
         targetAudioEncoder: "copy",
         targetVideoEncoder: "copy",
@@ -59,6 +69,8 @@ export function ParseOptions(): AppOptions {
         copyRelativeFolderPath: false,
         getInfo: false,
         convertVideo: false,
+        saveJobFile: "",
+        jobFile: "",
         xArgs: [],
         help: false,
     };
@@ -85,13 +97,26 @@ export function ParseOptions(): AppOptions {
             case USE_CUDA_OPTION_NAME:
                 options[USE_CUDA_OPTION_NAME] = true;
                 break;
+            case FILES_TO_COPY_EXTENSIONS_OPTION_NAME:
+                // eslint-disable-next-line no-case-declarations
+                const copyExtension = argv[++i] ?? "";
+                if (copyExtension.length > 0) {
+                    options[FILES_TO_COPY_EXTENSIONS_OPTION_NAME] = copyExtension.split(",").map((s) => s.toLowerCase())
+                } else {
+                    stdout.write(`${FILES_TO_COPY_EXTENSIONS_OPTION_NAME} cannot be empty: ${copyExtension}${EOL}`);
+                    return {
+                        ...options,
+                        help: true
+                    }
+                }
+                break;
             case ALLOWED_FILE_EXTENSIONS_OPTION_NAME:
                 // eslint-disable-next-line no-case-declarations
-                const extension = argv[++i] ?? "";
-                if (extension.length > 0) {
-                    options[ALLOWED_FILE_EXTENSIONS_OPTION_NAME] = extension.split(",").map((s) => s.toLowerCase())
+                const processExtension = argv[++i] ?? "";
+                if (processExtension.length > 0) {
+                    options[ALLOWED_FILE_EXTENSIONS_OPTION_NAME] = processExtension.split(",").map((s) => s.toLowerCase())
                 } else {
-                    stdout.write(`${ALLOWED_FILE_EXTENSIONS_OPTION_NAME} cannot be empty: ${extension}${EOL}`);
+                    stdout.write(`${ALLOWED_FILE_EXTENSIONS_OPTION_NAME} cannot be empty: ${processExtension}${EOL}`);
                     return {
                         ...options,
                         help: true
@@ -107,9 +132,25 @@ export function ParseOptions(): AppOptions {
             case TARGET_VIDEO_ENCODER_PATH_OPTION_NAME:
                 options[TARGET_VIDEO_ENCODER_PATH_OPTION_NAME] = (argv[++i] as VideoEncoder) ?? INVALID;
                 break;
+            case FILES_TO_COPY_REGEX_OPTION_NAME:
+                // eslint-disable-next-line no-case-declarations
+                const copyRegexString = argv[++i];
+                try {
+                    // FIXME: for now all regex provided will be case insensitive...
+                    options[FILES_TO_COPY_REGEX_OPTION_NAME] = new RegExp(copyRegexString, "i");
+                } catch (err) {
+                    throw new Error(`${FILES_TO_COPY_REGEX_OPTION_NAME} regex is not valid "${copyRegexString}" : ${err}`)
+                }
+                break;
             case TARGET_FILE_NAME_REGEX_OPTION_NAME:
-                // FIXME: for now all regex provided will be case insensitive...
-                options[TARGET_FILE_NAME_REGEX_OPTION_NAME] = new RegExp(argv[++i], "i");
+                // eslint-disable-next-line no-case-declarations
+                const targetRegexString = argv[++i];
+                try {
+                    // FIXME: for now all regex provided will be case insensitive...
+                    options[TARGET_FILE_NAME_REGEX_OPTION_NAME] = new RegExp(targetRegexString, "i");
+                } catch (err) {
+                    throw new Error(`${TARGET_FILE_NAME_REGEX_OPTION_NAME} regex is not valid "${targetRegexString}" : ${err}`)
+                }
                 break;
             case SAVE_PATH_OPTION_NAME:
                 options[SAVE_PATH_OPTION_NAME] = argv[++i] ?? "";
@@ -126,15 +167,20 @@ export function ParseOptions(): AppOptions {
             case CONVERT_VIDEO_OPTION_NAME:
                 options[CONVERT_VIDEO_OPTION_NAME] = true;
                 break;
+            case SAVE_JOB_FILE_OPTION_NAME:
+                options[SAVE_JOB_FILE_OPTION_NAME] = argv[++i];
+                break;
+            case READ_JOB_FILE_OPTION_NAME:
+                options[READ_JOB_FILE_OPTION_NAME] = argv[++i];
+                break;
             default:
-                // If we get here we did somthing wrong... print help and return?
+                // If we get here we did something wrong... print help and return?
                 // FIXME: abstract how this is output?
                 stdout.write(`invalid arg provided: ${argv[i]}${EOL}`);
                 return {
                     ...options,
                     help: true, // force help to true so help text also prints...
                 };
-                break;
         }
 
     }
@@ -152,12 +198,20 @@ export function PrintHelp() {
                 description: "The path that will be searched for files to process.",
             },
             {
+                name: FILES_TO_COPY_EXTENSIONS_OPTION_NAME,
+                description: "A comma separated list of file extensions to use when a file should be copied. (Case Insensitive)",
+            },
+            {
+                name: FILES_TO_COPY_REGEX_OPTION_NAME,
+                description: "a regular expression that will be applied to each file in the source path. When a match occurs the file will be copied. (Case Insensitive)",
+            },
+            {
                 name: USE_CUDA_OPTION_NAME,
                 description: "A flag. When provided will add flags to FFMPEG to support hardware accelerated encoders.",
             },
             {
                 name: ALLOWED_FILE_EXTENSIONS_OPTION_NAME,
-                description: "A comma seperated list of file extensions to use when assessing if a video should be transcoded. (Case Insensitive)",
+                description: "A comma separated list of file extensions to use when assessing if a video should be transcoded. (Case Insensitive)",
             },
             {
                 name: TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME,
@@ -173,7 +227,7 @@ export function PrintHelp() {
             },
             {
                 name: TARGET_FILE_NAME_REGEX_OPTION_NAME,
-                description: "a regular expression that will be applied to each file in the source path. When a match occurrs the file will be processed. (Case Insensitive)",
+                description: "a regular expression that will be applied to each file in the source path. When a match occurs the file will be processed. (Case Insensitive)",
             },
             {
                 name: SAVE_PATH_OPTION_NAME,
@@ -194,6 +248,14 @@ export function PrintHelp() {
             {
                 name: CONVERT_VIDEO_OPTION_NAME,
                 description: "A flag. When present will convert video files based on options provided.",
+            },
+            {
+                name: SAVE_JOB_FILE_OPTION_NAME,
+                description: `A path where the app will create an initial job file that can be loaded later with. --${READ_JOB_FILE_OPTION_NAME}`,
+            },
+            {
+                name: READ_JOB_FILE_OPTION_NAME,
+                description: `A path to a job file. This allows the app to resume previous jobs if its state was saved. Job file scan be produced with the --${SAVE_JOB_FILE_OPTION_NAME} flag.`,
             },
             {
                 name: X_ARGS_OPTION_NAME,

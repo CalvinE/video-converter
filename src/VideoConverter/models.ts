@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { FileInfo } from "../FileManager";
+import { AppOptions } from "../OptionsParser";
 
 /**
  * @description This options is valid for video container format, audio codec, and video codec. When set it uses the value of the source file.
@@ -8,6 +9,42 @@ import { FileInfo } from "../FileManager";
 export const COPY = "copy";
 export const INVALID = "invalid";
 
+export type SubCommand = "convert" | "getinfo" | `${typeof INVALID}`;
+
+export type Task = SubCommand | `${typeof COPY}`;
+
+export type State = "pending" | "running" | "completed" | "error";
+
+export type JobFile = {
+  options: AppOptions;
+  jobs: ConvertJob | GetInfoJob | CopyJob[];
+}
+
+export type BaseJob = {
+  commandID: string;
+  failureReason?: string;
+  fileInfo: FileInfo;
+  state: State;
+}
+
+export type ConvertJob = BaseJob & {
+  task: "convert";
+  options: VideoConvertOptions;
+  result?: VideoConvertResult;
+}
+
+export type GetInfoJob = BaseJob & {
+  task: "getinfo";
+  options: GetVideoInfoOptions;
+  result?: VideoGetInfoResult;
+}
+
+export type CopyJob = BaseJob & {
+  task: "copy";
+  targetFileFullPath: string;
+  result?: boolean;
+};
+
 export const VideoContainerFormat_MP4 = "mp4";
 export const VideoContainerFormat_MOV = "mov";
 export const VideoContainerFormat_AVI = "avi";
@@ -15,9 +52,9 @@ export const VideoContainerFormat_AVI = "avi";
 export type VideoContainerFormat = `${typeof VideoContainerFormat_MP4 | typeof VideoContainerFormat_MOV | typeof VideoContainerFormat_AVI | typeof COPY | typeof INVALID}`;
 
 // FIXME: Having this hard coded is an issue, we should pull encoders from the `ffmpeg -codecs` command?
-export const LibX265ViceoEncoder = "libx265";
+export const LibX265VideoEncoder = "libx265";
 
-export type VideoEncoder = `${typeof LibX265ViceoEncoder | typeof COPY | typeof INVALID}`;
+export type VideoEncoder = `${typeof LibX265VideoEncoder | typeof COPY | typeof INVALID}`;
 
 // FIXME: Having this hard coded is an issue, we should pull encoders from the `ffmpeg -codecs` command?
 export type AudioEncoder = `${typeof COPY | typeof INVALID}`;
@@ -52,7 +89,6 @@ export type GetVideoInfoOptions = BaseVideoConverterOptions;
 
 export type VideoConvertOptions = BaseVideoConverterOptions & {
   useCuda: boolean;
-  sourceFileFullPath: string;
   targetFileFullPath: string;
   targetVideoEncoding: VideoEncoder;
   targetAudioEncoding: AudioEncoder;
@@ -130,6 +166,10 @@ export function getVideoInfoCommandID(): string {
 
 export function getConvertVideoCommandID(): string {
   return `convertVideoCodec-${randomUUID()}`
+}
+
+export function getJobCommandID(task: Task): string {
+  return `${task}-${randomUUID()}`
 }
 
 export type VideoInfo = {

@@ -1,10 +1,10 @@
 import { join, resolve } from 'path';
-import { CommandStdErrMessageReceivedEventData, getConvertVideoCommandID, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions } from './VideoConverter/models';
+import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJob, GetInfoJob, CopyJob, INVALID } from './VideoConverter/models';
 import { IOutputWriter } from './OutputWriter/models';
 import { ConsoleOutputWriter } from './OutputWriter/ConsoleOutputWriter';
 import { FileManager, FSItem, FileInfo } from './FileManager';
 import { FileLogger, ILogger } from './Logger';
-import { FFMPEGVideoConverter, getVideoInfoCommandID } from './VideoConverter';
+import { FFMPEGVideoConverter } from './VideoConverter';
 import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
 import { bytesToHumanReadableBytes, millisecondsToHHMMSS } from './PrettyPrint';
 
@@ -19,9 +19,11 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
     * Improve code here so there is not so much in one place to try and read...
     * produce a stats object we can write to another file?
     * Have a job state file so jobs can be resumed if cancelled.
-    * handle signals to cancel the command properly like Ctrl+C
+    * handle signals to cancel the command properly like ???
     * Have a file name alteration function replace certain string with others, etc...
-    * write help info...
+    * write *better* help info...
+    * add log file directory as parameter
+    * fix potential issue in options parser where there may be only one arg before options...
 */
 
 (async function () {
@@ -29,96 +31,328 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
     // const logger: ILogger = new PrettyJSONConsoleLogger("verbose");
     const appLogger: ILogger = new FileLogger("verbose", "./logs", true);
     appLogger.LogDebug("application starting", { appOptions })
-    const outputWriter: IOutputWriter = new ConsoleOutputWriter();
-    await outputWriter.initialize()
+    const appOutputWriter: IOutputWriter = new ConsoleOutputWriter();
+    await appOutputWriter.initialize()
     const fileManager = new FileManager(appLogger);
     const ffmpegVideoConverter = new FFMPEGVideoConverter("ffmpeg", "ffprobe", appLogger, fileManager);
-    appLogger.LogDebug("checking to see if we have access to ffmpeg and ffprobe", {});
     try {
+        if (appOptions.help === true) {
+            // print help and return...
+            processHelpCommand();
+            return;
+        }
+
+        appLogger.LogDebug("checking to see if we have access to ffmpeg and ffprobe", {});
         const commandCheckResult = await ffmpegVideoConverter.checkCommands();
         process.on("SIGINT", () => {
             throw new Error("SIGINT received, terminating application...")
         });
         if (!commandCheckResult.success) {
+            appOutputWriter.writeLine("check for ffmpeg and ffprobe failed");
             appLogger.LogError("check for ffmpeg and ffprobe failed", new Error("ffmpeg or ffprobe are not installed?"), { commandCheckResult });
             return;
         }
-        if (appOptions.help === true) {
-            // print help and return...
-            processHelpCommand();
-        } else if (appOptions.getInfo === true) {
-            await processGetInfo();
-        } else if (appOptions.convertVideo === true) {
-            await processVideoConvertCommand();
+
+        appLogger.LogDebug("ffmpeg and ffprobe found on system", { commandCheckResult });
+        appOutputWriter.writeLine("ffmpeg and ffprobe found on system");
+
+        let jobs: Array<ConvertJob | GetInfoJob | CopyJob> = [];
+        if (appOptions.jobFile !== "") {
+            // we are reading from a job file, so no need to parse other args and create jobs,
+            appLogger.LogInfo("reading job data from file", { targetJobFile: appOptions.jobFile });
+            appOutputWriter.write(`reading job data from ${appOptions.jobFile}`);
+            const jobFileData = fileManager.readFile(appOptions.jobFile);
+            jobs = JSON.parse(jobFileData);
+        } else {
+            // we need to make the jobs based on appOptions
+            let subCommand: SubCommand = INVALID;
+            if (appOptions.convertVideo === true) {
+                appLogger.LogDebug("convert flag found", {});
+                subCommand = "convert";
+            } else if (appOptions.getInfo === true) {
+                appLogger.LogDebug("getinfo flag found", {});
+                subCommand = "getinfo";
+            }
+            appLogger.LogInfo("enumerating source path", { sourcePath: appOptions.sourcePath });
+            appOutputWriter.writeLine(`enumerating directory: ${appOptions.sourcePath}`);
+            const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
+            jobs = getAllJobs(appLogger, subCommand, sourcePathContents, appOptions);
+            if (appOptions.saveJobFile !== "") {
+                appLogger.LogInfo("saving job file", { savedJobFile: appOptions.saveJobFile });
+                appOutputWriter.write(`saving ${jobs?.length} jobs to ${appOptions.saveJobFile}`);
+                const fileJobData = JSON.stringify(jobs);
+                fileManager.writeFile(appOptions.saveJobFile, fileJobData, true);
+                return;
+            }
         }
+        appLogger.LogInfo("jobs loaded", { numJobs: jobs.length });
+        appLogger.LogVerbose("listing all jobs", { jobs });
+        appOutputWriter.writeLine(`found ${jobs?.length} jobs based on parameters`);
+        let totalSizeReduction = 0;
+        const startTimeMilliseconds = Date.now();
+        let successfulJobs = 0;
+        let failedJobs = 0;
+        for (const job of jobs) {
+            if (job.state === "running" || job.state === "error") {
+                // a job was started, so we need to clean up the what files may have been created
+                appLogger.LogInfo(`attempting to restart job`, { job });
+                appOutputWriter.writeLine(`attempting to restart job: ${job.state} - ${job.task} - ${job.commandID}`);
+                if (job.task === "convert") {
+                    appOutputWriter.writeLine(`attempting to remove partially processed file: ${job.options.targetFileFullPath}`);
+                    fileManager.safeUnlinkFile(job.options.targetFileFullPath);
+                } else if (job.task === "copy") {
+                    appOutputWriter.writeLine(`attempting to remove partially processed file: ${job.targetFileFullPath}`);
+                    fileManager.safeUnlinkFile(job.targetFileFullPath);
+                }
+                job.state = "pending";
+            } else if (job.state === "completed") {
+                // skip the job its already done...
+                appLogger.LogInfo("job is already completed... skipping...", { commandID: job.commandID, task: job.task, sourceFile: job.fileInfo.fullPath });
+                appLogger.LogVerbose("previously completed job data", { job });
+                appOutputWriter.writeLine(`previous completed job ${job.commandID}... see logs for details.`);
+                continue;
+            }
+            // pending is the only other state?
+            appLogger.LogInfo("starting job", { commandID: job.commandID });
+            appOutputWriter.writeLine(`starting job ${job.commandID} - ${job.task}`)
+            appLogger.LogDebug("job options", { job });
+            let success = false
+            let durationMilliseconds = 0;
+            let sizeBytesReduction = 0;
+            let sourceFile = "";
+            let targetFile = "";
+            try {
+                if (job.task === "convert") {
+                    job.state = "running";
+                    const result = await processVideoConvertCommand(appLogger, appOutputWriter, job);
+                    durationMilliseconds = result.duration;
+                    totalSizeReduction += result.sizeDifference;
+                    sizeBytesReduction = result.sizeDifference;
+                    sourceFile = result.sourceFileFullPath;
+                    targetFile = result.targetFileFullPath;
+                    job.state = "completed";
+                    job.result = result;
+                    success = result.success;
+                } else if (job.task === "getinfo") {
+                    job.state = "running";
+                    const result = await processGetInfo(appLogger, appOutputWriter, job);
+                    durationMilliseconds = result.duration;
+                    sourceFile = result.sourceFileFullPath;
+                    job.state = "completed";
+                    job.result = result;
+                    success = result.success
+                } else if (job.task === "copy") {
+                    job.state = "running";
+                    sourceFile = job.fileInfo.fullPath;
+                    const targetFile = job.targetFileFullPath;
+                    appOutputWriter.writeLine(`copying file: ${sourceFile} => ${targetFile}`);
+                    const now = Date.now();
+                    success = fileManager.copyFile(sourceFile, targetFile);
+                    const then = Date.now();
+                    durationMilliseconds = then - now;
+                    job.state = "completed";
+                    job.result = success;
+                } else {
+                    /// We should not be allowed to get here...
+                    appLogger.LogWarn("job with invalid task encountered...", job);
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (job as any).state = "error";
+                }
+                if (success !== true) {
+                    failedJobs++;
+                    appLogger.LogWarn("job failed", {
+                        job
+                    });
+                    appOutputWriter.writeLine(`job ${job.commandID} failed see logs for details`);
+                    appOutputWriter.writeLine(`run time: ${millisecondsToHHMMSS(durationMilliseconds)}`);
+                } else {
+                    successfulJobs++;
+                    appLogger.LogInfo("job successful", { job });
+                    appOutputWriter.writeLine(`job ${job.commandID} completed`);
+                    appOutputWriter.writeLine(`run time: ${millisecondsToHHMMSS(durationMilliseconds)}`);
+                    if (sizeBytesReduction !== 0) {
+                        appOutputWriter.writeLine(`file size reduced by ${bytesToHumanReadableBytes(sizeBytesReduction)}`);
+                    }
+                    if (sourceFile !== "") {
+                        appOutputWriter.writeLine(`source => ${sourceFile}`);
+                        if (targetFile !== "") {
+                            appOutputWriter.writeLine(`target => ${targetFile}`);
+                        }
+                    }
+                }
+                // add a line to make it easier to read.
+                appOutputWriter.writeLine("");
+            } catch (err) {
+                failedJobs++;
+                job.state = "error";
+                job.failureReason = `${err}`;
+                appOutputWriter.writeLine(`an error occurred while processing job ${job.commandID}`);
+                appOutputWriter.writeLine(`error: ${job.failureReason}`);
+            }
+        }
+        // add a line to make it easier to read.
+        appOutputWriter.writeLine("");
+        const endTimeMilliseconds = Date.now();
+        const durationMilliseconds = endTimeMilliseconds - startTimeMilliseconds;
+        const prettyDuration = millisecondsToHHMMSS(durationMilliseconds);
+        const prettyTotalSizeReduction = bytesToHumanReadableBytes(totalSizeReduction);
+        const totalJobs = jobs.length;
+        appLogger.LogInfo("all jobs finished", { prettyDuration, durationMilliseconds, prettyTotalSizeReduction, totalSizeReduction, successfulJobs, failedJobs, totalJobs })
+        appOutputWriter.writeLine(`All jobs completed`);
+        appOutputWriter.writeLine(`Run time: ${prettyDuration}`);
+        appOutputWriter.writeLine(`Total Size Reduction: ${prettyTotalSizeReduction}`);
+        appOutputWriter.writeLine(`Jobs Successful: ${successfulJobs}`);
+        appOutputWriter.writeLine(`Jobs Failed: ${failedJobs}`);
+        appOutputWriter.writeLine(`Total number of jobs: ${totalJobs}`);
 
     } catch (err: unknown) {
         appLogger.LogError("app encountered fatal error!", err as Error, {});
-        outputWriter.writeLine("app encountered fatal error, please see the logs");
+        appOutputWriter.writeLine("app encountered fatal error, please see the logs");
     } finally {
-        await outputWriter.shutdown();
+        await appOutputWriter.shutdown();
         await appLogger.shutdown();
     }
 
-    function getTargetFileFullPath(logger: ILogger, sourceFile: FileInfo, options: AppOptions): string {
-        let targetFileFullPath: string;
-        logger.LogVerbose("attempting to build taget file full path", { source: sourceFile, options });
+    function getTargetFileFullPath(logger: ILogger, sourceFile: FileInfo, options: AppOptions): {
+        absoluteParentPath: string,
+        targetFileFullPath: string
+    } {
+        let absoluteParentPath: string;
+        logger.LogVerbose("attempting to build target file full path", { source: sourceFile, options });
         if (options.saveInPlace) {
-            targetFileFullPath = sourceFile.fullPath;
+            absoluteParentPath = sourceFile.fullPath;
             logger.LogDebug("save in place options set. using source file full path", { sourceFileFullPath: sourceFile.fullPath });
         } else if (options.copyRelativeFolderPath) {
-            const fullRelativePath = join(options.savePath, sourceFile.relativepath);
-            targetFileFullPath = resolve(fullRelativePath);
-            logger.LogDebug("using options save path and source file relative path for target file path", { targetFileFullPath });
+            const fullRelativePath = join(options.savePath, sourceFile.relativePath);
+            absoluteParentPath = resolve(fullRelativePath);
+            logger.LogDebug("using options save path and source file relative path for target file path", { absoluteParentPath });
         } else {
-            targetFileFullPath = resolve(options.savePath);
-            logger.LogDebug("using options save path for target file path", { targetFileFullPath });
+            absoluteParentPath = resolve(options.savePath);
+            logger.LogDebug("using options save path for target file path", { absoluteParentPath });
         }
 
-
-        let targetFileName: string;
+        let targetFileFullPath: string;
         if (options.targetContainerFormat === "copy") {
-            targetFileName = sourceFile.name;
+            targetFileFullPath = sourceFile.name;
             logger.LogDebug("option target container format is set to copy, so we are not changing the extension", {});
         } else {
-            targetFileName = `${sourceFile.name.substring(sourceFile.name.lastIndexOf("."))}.${options.targetContainerFormat}`;
-            logger.LogDebug("using option taget container format on file name", { targetFileName, targetContainerFormat: options.targetContainerFormat });
+            targetFileFullPath = `${sourceFile.name.substring(sourceFile.name.lastIndexOf("."))}.${options.targetContainerFormat}`;
+            logger.LogDebug("using option target container format on file name", { targetFileName: targetFileFullPath, targetContainerFormat: options.targetContainerFormat });
         }
 
-        const result = join(targetFileFullPath, targetFileName);
-        logger.LogDebug("target file location built", { sourceFile, targetFileLocation: result });
-        return result;
+        targetFileFullPath = join(absoluteParentPath, targetFileFullPath);
+        logger.LogDebug("target file location built", { sourceFile, absoluteParentPath, targetFileFullPath, });
+        return {
+            absoluteParentPath,
+            targetFileFullPath,
+        };
     }
 
-    function getAllFiles(logger: ILogger, items: FSItem[], allowedFileExtensions: string[], targetFileNameRegex?: RegExp): FileInfo[] {
-        logger.LogDebug("getting all files based on parameters", { targetFileNameRegex: targetFileNameRegex?.source, allowedFileExtensions })
-        const files: FileInfo[] = [];
+    function doesFileMatchCriteria(logger: ILogger, item: FileInfo, task: Task, allowedFileExtensions: string[], fileNameRegex?: RegExp): boolean {
+        if (fileNameRegex !== undefined) {
+            if (fileNameRegex.test(item.name)) {
+                logger.LogDebug("adding file for processing because it matched the regex", {
+                    targetFileNameRegex: fileNameRegex.source,
+                    file: item,
+                    task,
+                })
+                return true;
+            } else {
+                logger.LogInfo("skipping file because regex did not match name", {
+                    targetFileNameRegex: fileNameRegex,
+                    file: item,
+                    task
+                });
+                return false;
+            }
+        } else if (allowedFileExtensions.indexOf(item.extension) >= 0) {
+            logger.LogDebug("file selected because extension matched allowed file extensions", {
+                allowedFileExtensions,
+                file: item,
+                task,
+            });
+            return true
+        }
+        return false;
+    }
+
+    function makeJob(logger: ILogger, task: Task, fileInfo: FileInfo, appOptions: AppOptions): (ConvertJob | GetInfoJob | CopyJob) {
+        const commandID = getJobCommandID(task);
+        logger.LogVerbose(`making job of type ${task}`, { fileInfo, appOptions, task });
+        if (task === "convert") {
+            const targetFileFullPath = getTargetFileFullPath(appLogger, fileInfo, appOptions).targetFileFullPath;
+            const videoConvertOptions: VideoConvertOptions = {
+                commandID,
+                useCuda: appOptions.useCuda,
+                timeoutMilliseconds: CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS,
+                targetAudioEncoding: appOptions.targetAudioEncoder,
+                targetVideoEncoding: appOptions.targetVideoEncoder,
+                targetFileFullPath: targetFileFullPath,
+                xArgs: appOptions.xArgs,
+            };
+            return {
+                commandID,
+                fileInfo,
+                state: "pending",
+                task: "convert",
+                options: videoConvertOptions,
+            };
+        } else if (task === "getinfo") {
+            const getVideoInfoOptions: GetVideoInfoOptions = {
+                commandID,
+                timeoutMilliseconds: CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS,
+                xArgs: appOptions.xArgs,
+            };
+            return {
+                commandID,
+                fileInfo,
+                state: "pending",
+                task: "getinfo",
+                options: getVideoInfoOptions,
+            };
+        } else if (task === "copy") {
+            const targetFileFullPath = getTargetFileFullPath(appLogger, fileInfo, appOptions).targetFileFullPath;
+            return {
+                commandID,
+                fileInfo,
+                state: "pending",
+                task: "copy",
+                targetFileFullPath,
+            }
+        }
+        const error = new Error(`invalid task type encountered: ${task}`)
+        logger.LogError("invalid task type provided", error, {
+            task,
+            fileInfo,
+            options: appOptions,
+        });
+        throw error;
+    }
+
+    function getAllJobs(logger: ILogger, subCommand: SubCommand, items: FSItem[], options: AppOptions,): Array<ConvertJob | GetInfoJob | CopyJob> {
+        logger.LogDebug("getting all files based on parameters", { targetFileNameRegex: options.targetFileNameRegex?.source, allowedFileExtensions: options.allowedFileExtensions })
+        const allowCopy = !options.saveInPlace;
+        const jobs: Array<ConvertJob | GetInfoJob | CopyJob> = [];
         for (const item of items) {
-            if (item.type === 'file') {
-                if (targetFileNameRegex !== undefined) {
-                    if (targetFileNameRegex.test(item.name)) {
-                        logger.LogDebug("adding file for processing because it matched the regex", {
-                            targetFileNameRegex: targetFileNameRegex.source,
-                            file: item,
-                        })
-                        files.push(item);
-                    } else {
-                        logger.LogInfo("skipping file because regex did not match name", {
-                            targetFileNameRegex: targetFileNameRegex.source,
-                            file: item,
-                        });
-                    }
-                } else if (allowedFileExtensions.indexOf(item.extension)) { // TODO: implement other file matching? like file extension? all video formats?
-                    files.push(item);
+            if (item.type === "file") {
+                if (doesFileMatchCriteria(logger, item, subCommand, options.allowedFileExtensions, options.targetFileNameRegex)) {
+                    jobs.push(makeJob(logger, subCommand, item, options));
+                }
+                else if (allowCopy && doesFileMatchCriteria(logger, item, "copy", options.fileCopyExtensions, options.fileCopyRegex)) {
+                    // is file one we should copy?
+                    logger.LogInfo("copy job created", {
+                        fileInfo: item,
+                    });
+                    jobs.push(makeJob(logger, "copy", item, options));
                 } else {
                     logger.LogDebug("file name does not match the selection criteria", { fileName: item.name });
                 }
             } else if (item.type === 'directory') {
-                const subItems = getAllFiles(logger, item.files, appOptions.allowFileExtensions, targetFileNameRegex);
-                files.push(...subItems);
+                const subItems: Array<ConvertJob | GetInfoJob | CopyJob> = getAllJobs(logger, subCommand, item.files, options);
+                jobs.push(...subItems);
             }
         }
-        return files;
+        return jobs;
     }
 
     function processHelpCommand() {
@@ -127,135 +361,80 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appLogger.LogInfo("help command finished", {});
     }
 
-    async function processGetInfo() {
-        appLogger.LogInfo("get info command invoked", {});
-        const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
-        const files = getAllFiles(appLogger, sourcePathContents, appOptions.allowFileExtensions, appOptions.targetFileNameRegex);
-        const numFiles = files.length;
-        appLogger.LogInfo("attempting to info for files", {
-            numFiles,
+    async function processGetInfo(_logger: ILogger, _outputWriter: IOutputWriter, job: GetInfoJob): Promise<VideoGetInfoResult> {
+        _outputWriter.writeLine(`getting file info: ${job.fileInfo.fullPath}`);
+        const details = await ffmpegVideoConverter.getVideoInfo(job.fileInfo, {
+            commandID: job.commandID,
+            timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
+            xArgs: appOptions.xArgs,
         });
-        const fileDetails: VideoGetInfoResult[] = [];
-        let i = 0;
-        for (const f of files) {
-            appLogger.LogDebug(`attempting to get info for file ${i++} of ${numFiles}`, {});
-            const details = await ffmpegVideoConverter.getVideoInfo(f, {
-                commandID: getVideoInfoCommandID(),
-                timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-                xArgs: appOptions.xArgs,
-            });
-            if (details.success) {
-                appLogger.LogVerbose(`got info for file ${i++} of ${numFiles}`, details);
-            } else {
-                appLogger.LogWarn(`failed to get info for file ${i++} of ${numFiles}`, details);
-            }
-            fileDetails.push(details);
-        }
-        outputWriter.writeObject(fileDetails);
-        appLogger.LogInfo("get info command finished", {});
+        return details;
     }
 
-    async function processVideoConvertCommand() {
-        let totalRunTimeMilliseconds = 0;
-        let totalSizeDifference = 0;
-        appLogger.LogInfo("video convert command invoked", {});
-        outputWriter.writeLine("video convert command invoked");
-        const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
-        const files = getAllFiles(appLogger, sourcePathContents, appOptions.allowFileExtensions, appOptions.targetFileNameRegex);
-        const numFiles = files.length;
-        appLogger.LogInfo("attempting to convert files", {
-            numFiles,
-        });
-        outputWriter.writeLine(`attempting to convert ${numFiles} files`);
-        let i = 0;
-        for (const f of files) {
-            i++;
-            const commandID = getConvertVideoCommandID();
-            appLogger.LogDebug(`attempting to convert file ${i} of ${numFiles}`, { commandID });
-            outputWriter.writeLine(`attempting to convert file ${i} of ${numFiles}`);
-            const targetFileFullPath = getTargetFileFullPath(appLogger, f, appOptions);
-            appLogger.LogDebug("getting video file info so that we can calculate progressive updates", { commandID, })
-            const videoInfoResult = await ffmpegVideoConverter.getVideoInfo(f, {
-                commandID,
-                timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-                xArgs: [],
-            })
-            if (videoInfoResult.success !== false) {
-                appLogger.LogWarn("failed to get video info", { videoInfoResult })
-            }
-            const videoConvertOptions: VideoConvertOptions = {
-                commandID,
-                useCuda: appOptions.useCuda,
-                timeoutMilliseconds: CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS,
-                sourceFileFullPath: f.fullPath,
-                targetAudioEncoding: appOptions.targetAudioEncoder,
-                targetVideoEncoding: appOptions.targetVideoEncoder,
-                targetFileFullPath: targetFileFullPath,
-                xArgs: appOptions.xArgs,
-            }
-            appLogger.LogInfo("attempting to convert video", { file: f, commandID, videoConvertOptions: videoConvertOptions })
-            outputWriter.writeLine(`file: ${videoConvertOptions.sourceFileFullPath}`);
-            const convertPromise = ffmpegVideoConverter.convertVideo(f, videoConvertOptions);
-            const outputWriterSupportsProgressiveUpdates = outputWriter.supportsProgressiveUpdates() && videoInfoResult.success === true;
-            const outputHandler = (() => {
-                const videoStream: VideoStreamInfo | undefined = (videoInfoResult.videoInfo.streams.find(s => s.codec_type === "video") as VideoStreamInfo);
-                const numberOfFrames = videoStream?.nb_frames;
-                const numberOfFramesNumber = parseInt(numberOfFrames ?? "-1", 10);
-                const hasNumberOfFrames = numberOfFramesNumber !== -1;
-                if (!hasNumberOfFrames) {
-                    appLogger.LogDebug("could not determine number of frames in video. progressive updates cancelled.", { commandID, numberOfFrames, numberOfFramesNumber });
-                } else {
-                    appLogger.LogDebug("parsed out number of frames. progressive updated will be provided.", { commandID, numberOfFrames, numberOfFramesNumber });
-                }
-                let messageCount = 0;
-                return (args: CommandStdErrMessageReceivedEventData) => {
-                    if (args.commandId == commandID) {
-                        if (hasNumberOfFrames && outputWriterSupportsProgressiveUpdates) {
-                            appLogger.LogDebug("constructing progressive update line", { commandID, message: args.commandMessage })
-                            // This is our current command we should do somthing with it?
-                            const regexMatch = args.commandMessage.match(FFMPEG_CURRENT_FRAME_REGEX);
-                            const currentFrame = regexMatch?.groups?.framenumber;
-                            appLogger.LogDebug("current frame found", { commandID, currentFrame, numberOfFramesNumber })
-                            if (currentFrame) {
-                                const currentFrameNumber = parseInt(currentFrame, 10);
-                                const pctDone = Math.floor(currentFrameNumber / numberOfFramesNumber * 100);
-                                const numMarkers = Math.floor(pctDone / 5);
-                                appLogger.LogVerbose("found current frame", { commandID, numberOfFramesNumber, currentFrame, currentFrameNumber, pctDone, numMarkers });
-                                const arrow = `${"=".repeat(numMarkers ?? 0)}>`.padEnd(20, " ")
-                                const progressiveUpdate = `|${arrow}| %${pctDone}`.padEnd(PROGRESSIVE_UPDATE_CHAR_WIDTH, " ");
-                                outputWriter.write(`${progressiveUpdate}\r`);
-                            }
-                        } else {
-                            // lets show that somthing is happening...
-                            if (messageCount % 10 === 0) {
-                                outputWriter.write(".");
-                            }
-                            messageCount++;
-                        }
-                    }
-                }
-            })();
-            appLogger.LogDebug("progressive updates availability determined", { outputWriterSupportsProgressiveUpdates })
-            ffmpegVideoConverter.on(VideoConverterEventName_StdErrMessageReceived, outputHandler)
-            const convertResult = await convertPromise
-            ffmpegVideoConverter.off(VideoConverterEventName_StdErrMessageReceived, outputHandler)
-            // write an empty line to advance the progressive update line
-            outputWriter.writeLine("");
-            totalRunTimeMilliseconds += convertResult.duration;
-            totalSizeDifference += convertResult.sizeDifference;
-            if (convertResult.success) {
-                appLogger.LogVerbose(`converted file ${i} of ${numFiles}`, convertResult);
-                outputWriter.writeLine(`converted file ${i} of ${numFiles}`);
-                outputWriter.writeLine(`source: ${f.fullPath} => target: ${targetFileFullPath}`)
-                outputWriter.writeLine(`total time: ${convertResult.durationPretty} total space reduction ${convertResult.sizeDifferencePretty}:`)
-            } else {
-                appLogger.LogWarn(`failed to convert file ${i} of ${numFiles}`, convertResult);
-                outputWriter.writeLine(`failed to convert file ${i} of ${numFiles}`);
-            }
-            outputWriter.writeLine("");
+    function parseNumberOfFrames(videoInfo?: VideoGetInfoResult): number {
+        const videoStream: VideoStreamInfo | undefined = (videoInfo?.videoInfo?.streams?.find(s => s?.codec_type === "video") as VideoStreamInfo);
+        const numberOfFrames = videoStream?.nb_frames;
+        const numberOfFramesNumber = parseInt(numberOfFrames ?? "-1", 10);
+        return numberOfFramesNumber;
+    }
+
+    function buildConvertOutputHandler(logger: ILogger, outputWriter: IOutputWriter, commandID: string, numberOfFrames: number): (args: CommandStdErrMessageReceivedEventData) => void {
+        const hasNumberOfFrames = (numberOfFrames ?? -1) >= 1;
+        const outputWriterSupportsProgressiveUpdates = hasNumberOfFrames && outputWriter.supportsProgressiveUpdates();
+        if (!hasNumberOfFrames) {
+            logger.LogDebug("could not determine number of frames in video. progressive updates cancelled.", { commandID, numberOfFrames });
+        } else {
+            logger.LogDebug("parsed out number of frames. progressive updated will be provided.", { commandID, numberOfFrames });
         }
-        appLogger.LogInfo("video convert command finished", { totalRunTimeMilliseconds, prettyTotalRunTimeMilliseconds: millisecondsToHHMMSS(totalRunTimeMilliseconds), totalSizeDifference, prettyTotalSizeDifference: bytesToHumanReadableBytes(totalSizeDifference) });
-        outputWriter.writeLine(`video convert command finished: total run time = ${millisecondsToHHMMSS(totalRunTimeMilliseconds)} - total size reduction (bytes) = ${bytesToHumanReadableBytes(totalSizeDifference)}`);
+        let messageCount = 0;
+        return (args: CommandStdErrMessageReceivedEventData) => {
+            if (args.commandId == commandID) {
+                if (hasNumberOfFrames && outputWriterSupportsProgressiveUpdates) {
+                    logger.LogVerbose("constructing progressive update line", { commandID, message: args.commandMessage })
+                    // This is our current command we should do something with it?
+                    const regexMatch = args.commandMessage.match(FFMPEG_CURRENT_FRAME_REGEX);
+                    const currentFrame = regexMatch?.groups?.framenumber;
+                    logger.LogVerbose("current frame found", { commandID, currentFrame, numberOfFrames })
+                    if (currentFrame) {
+                        const currentFrameNumber = parseInt(currentFrame, 10);
+                        const pctDone = Math.floor(currentFrameNumber / numberOfFrames * 100);
+                        const numMarkers = Math.floor(pctDone / 5);
+                        logger.LogVerbose("percent done calculated", { commandID, numberOfFrames, currentFrame, currentFrameNumber, pctDone, numMarkers });
+                        const arrow = `${"=".repeat(numMarkers ?? 0)}>`.padEnd(20, " ")
+                        const progressiveUpdate = `|${arrow}| %${pctDone}`.padEnd(PROGRESSIVE_UPDATE_CHAR_WIDTH, " ");
+                        outputWriter.write(`${progressiveUpdate}\r`);
+                    }
+                } else {
+                    // lets show that something is happening...
+                    if (messageCount % 10 === 0) {
+                        outputWriter.write(".");
+                    }
+                    messageCount++;
+                }
+            }
+        }
+    }
+
+    async function processVideoConvertCommand(logger: ILogger, outputWriter: IOutputWriter, job: ConvertJob): Promise<VideoConvertResult> {
+        logger.LogDebug("getting video file info so that we can calculate progressive updates", { commandID: job.commandID, })
+        const videoInfoResult = await ffmpegVideoConverter.getVideoInfo(job.fileInfo, {
+            commandID: job.commandID,
+            timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
+            xArgs: [],
+        })
+        if (videoInfoResult.success !== false) {
+            logger.LogWarn("failed to get video info", { videoInfoResult })
+        }
+        appOutputWriter.writeLine(`converting file: ${job.fileInfo.fullPath}`);
+        const convertPromise = ffmpegVideoConverter.convertVideo(job.fileInfo, job.options);
+        const numberOfFrames = parseNumberOfFrames(videoInfoResult ?? {});
+        const outputHandler = buildConvertOutputHandler(logger, outputWriter, job.commandID, numberOfFrames);
+        ffmpegVideoConverter.on(VideoConverterEventName_StdErrMessageReceived, outputHandler);
+        const convertResult = await convertPromise
+        ffmpegVideoConverter.off(VideoConverterEventName_StdErrMessageReceived, outputHandler);
+        // write an empty line to advance the progressive update line
+        appOutputWriter.writeLine("");
+        return convertResult;
     }
 })().then(() => {
     // FIXME: make sure we are canceling any running jobs. handler interrupts like Ctrl+C?

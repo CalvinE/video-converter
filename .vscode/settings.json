@@ -1,3 +1,17 @@
 {
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "cSpell.words": [
+        "codepaths",
+        "Cuda",
+        "dahses",
+        "extradata",
+        "ffprobe",
+        "framenumber",
+        "getinfo",
+        "hwaccel",
+        "libx",
+        "sarg",
+        "Timedout",
+        "tsbuildinfo"
+    ]
 }

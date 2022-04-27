@@ -110,7 +110,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         const commandResults = await this.executeCommand(this._ffprobeCommand, args, `GetVideoInfo-${options.commandID}`, options.timeoutMilliseconds);
         const joinedCommandOutput = commandResults.fullOutput.join("");
         const videoInfo: VideoInfo = JSON.parse(joinedCommandOutput);
-        this._logger.LogVerbose("video info retreived", { videoInfo })
+        this._logger.LogVerbose("video info retrieved", { videoInfo })
         return {
             commandID: options.commandID,
             duration: commandResults.durationMilliseconds,
@@ -126,7 +126,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this._logger.LogDebug("attempting to convert a video", { sourceFile, options });
         const targetFilePath: string = dirname(options.targetFileFullPath)
         this._fileManager.makeDir(targetFilePath);
-        const args: string[] = [
+        let args: string[] = [
             "-i",
             `"${sourceFile.fullPath}"`,
             "-c:v",
@@ -137,7 +137,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             `"${options.targetFileFullPath}"`,
         ];
         if (options.useCuda === true) {
-            args.push("-hwaccel", "cuda", "-hwaccel_output_format", "cuda")
+            args = ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda", ...args];
         }
         const commandResult = await this.executeCommand(this._ffmpegCommand, args, options.commandID, options.timeoutMilliseconds);
         if (commandResult.success === true) {
