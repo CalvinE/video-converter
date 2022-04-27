@@ -1,6 +1,6 @@
 import { VideoContainerFormat, AudioEncoder, VideoEncoder, INVALID } from './VideoConverter/models';
 import { argv, stdout } from "process";
-import { EOL } from 'os';
+import { EOL } from "os";
 
 const DEFAULT_APPROVED_FILE_EXTENSIONS: string[] = ["mp4", "mkv", "avi", "mov"];
 
@@ -16,7 +16,7 @@ const COPY_RELATIVE_FOLDER_PATHS = "copyRelativeFolderPath";
 const SAVE_IN_PLACE = "saveInPlace";
 const GET_INFO_OPTION_NAME = "getInfo";
 const CONVERT_VIDEO_OPTION_NAME = "convertVideo"
-const X_ARG_OPTION_NAME = "xArg"
+const X_ARGS_OPTION_NAME = "xArgs"
 const HELP_OPTION_NAME = "help";
 
 export type AppOptions = {
@@ -32,8 +32,16 @@ export type AppOptions = {
     [SAVE_IN_PLACE]: boolean;
     [GET_INFO_OPTION_NAME]: boolean;
     [CONVERT_VIDEO_OPTION_NAME]: boolean;
-    [X_ARG_OPTION_NAME]: string[];
+    [X_ARGS_OPTION_NAME]: string[];
     [HELP_OPTION_NAME]: boolean;
+}
+
+function safeQuoteXArg(arg: string): string {
+    const sarg = arg?.toString() ?? "";
+    if (sarg?.indexOf(" ") >= 0) {
+        return `"${arg}"`
+    }
+    return sarg;
 }
 
 // cmd options are passed with preceeding 2 dahses EX: --help
@@ -51,17 +59,28 @@ export function ParseOptions(): AppOptions {
         copyRelativeFolderPath: false,
         getInfo: false,
         convertVideo: false,
-        xArg: [],
+        xArgs: [],
         help: false,
     };
+    // FIXME: this may need to be change so that it does not hard code the 2. If this app is npm installed I think that will be wrong.
     for (let i = 2; i < argv.length; i++) {
         const currentArg = argv[i].substring(2);
         switch (currentArg) {
             case HELP_OPTION_NAME:
                 options[HELP_OPTION_NAME] = true;
                 break;
+            case X_ARGS_OPTION_NAME:
+                // eslint-disable-next-line no-case-declarations
+                const xargs = JSON.parse(argv[++i]);
+                if (Array.isArray(xargs)) {
+                    const args = xargs.map((x) => safeQuoteXArg(x));
+                    options[X_ARGS_OPTION_NAME].push(...args);
+                } else {
+                    options[X_ARGS_OPTION_NAME].push(safeQuoteXArg(xargs as string));
+                }
+                break;
             case SOURCE_PATH_OPTION_NAME:
-                options[SOURCE_PATH_OPTION_NAME] = argv[++i] ?? "";
+                options[SOURCE_PATH_OPTION_NAME] = argv[++i];
                 break;
             case USE_CUDA_OPTION_NAME:
                 options[USE_CUDA_OPTION_NAME] = true;
@@ -70,7 +89,7 @@ export function ParseOptions(): AppOptions {
                 // eslint-disable-next-line no-case-declarations
                 const extension = argv[++i] ?? "";
                 if (extension.length > 0) {
-                    options[ALLOWED_FILE_EXTENSIONS_OPTION_NAME] = extension.split(",")
+                    options[ALLOWED_FILE_EXTENSIONS_OPTION_NAME] = extension.split(",").map((s) => s.toLowerCase())
                 } else {
                     stdout.write(`${ALLOWED_FILE_EXTENSIONS_OPTION_NAME} cannot be empty: ${extension}${EOL}`);
                     return {
@@ -124,5 +143,72 @@ export function ParseOptions(): AppOptions {
 
 export function PrintHelp() {
     // TODO: Write this and make some data in here to keep track of the info for the help data...
-    stdout.write(`Please wait for assistance... PSYCHE I did not implement this yet..${EOL}`)
+    const helpData: {
+        name: string,
+        description: string,
+    }[] = [
+            {
+                name: SOURCE_PATH_OPTION_NAME,
+                description: "The path that will be searched for files to process.",
+            },
+            {
+                name: USE_CUDA_OPTION_NAME,
+                description: "A flag. When provided will add flags to FFMPEG to support hardware accelerated encoders.",
+            },
+            {
+                name: ALLOWED_FILE_EXTENSIONS_OPTION_NAME,
+                description: "A comma seperated list of file extensions to use when assessing if a video should be transcoded. (Case Insensitive)",
+            },
+            {
+                name: TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME,
+                description: "The video container format that the transcoded video will be saved in. If not provided the video container format will not be changed.",
+            },
+            {
+                name: TARGET_AUDIO_ENCODER_PATH_OPTION_NAME,
+                description: "The audio encoder to use for the transcoding. If not provided the audio is copied in the transcoded file.",
+            },
+            {
+                name: TARGET_VIDEO_ENCODER_PATH_OPTION_NAME,
+                description: "The video encoder to use for the transcoding. If not provided the video is copied in the transcoded file.",
+            },
+            {
+                name: TARGET_FILE_NAME_REGEX_OPTION_NAME,
+                description: "a regular expression that will be applied to each file in the source path. When a match occurrs the file will be processed. (Case Insensitive)",
+            },
+            {
+                name: SAVE_PATH_OPTION_NAME,
+                description: "Sets where the output will be placed.",
+            },
+            {
+                name: COPY_RELATIVE_FOLDER_PATHS,
+                description: "A flag. When present will duplicate the folder structure after --sourcePath in the --savePath",
+            },
+            {
+                name: SAVE_IN_PLACE,
+                description: "A flag. When present converted video files will be placed in the same directory where the video to be converted is located.",
+            },
+            {
+                name: GET_INFO_OPTION_NAME,
+                description: "A flag. When present will get info about video files based on options provided.",
+            },
+            {
+                name: CONVERT_VIDEO_OPTION_NAME,
+                description: "A flag. When present will convert video files based on options provided.",
+            },
+            {
+                name: X_ARGS_OPTION_NAME,
+                description: "Allows additional info to be passed in to FFMPEG or FFPROBE. Best to use once for each item to append to the command. Also supports a JSON array of strings.",
+            },
+            {
+                name: HELP_OPTION_NAME,
+                description: "A flag. when present displays help info.",
+            },
+        ];
+    stdout.write(`video-converter usage:${EOL}`)
+    stdout.write(`video-converter [OPTIONS]${EOL}`)
+    stdout.write(EOL);
+    stdout.write(`Available options:${EOL}`)
+    for (const item of helpData) {
+        stdout.write(`--${item.name} - ${item.description}${EOL}`)
+    }
 }

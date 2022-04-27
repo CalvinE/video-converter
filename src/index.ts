@@ -142,7 +142,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             const details = await ffmpegVideoConverter.getVideoInfo(f, {
                 commandID: getVideoInfoCommandID(),
                 timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-                xArgs: appOptions.xArg,
+                xArgs: appOptions.xArgs,
             });
             if (details.success) {
                 appLogger.LogVerbose(`got info for file ${i++} of ${numFiles}`, details);
@@ -191,7 +191,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                 targetAudioEncoding: appOptions.targetAudioEncoder,
                 targetVideoEncoding: appOptions.targetVideoEncoder,
                 targetFileFullPath: targetFileFullPath,
-                xArgs: appOptions.xArg,
+                xArgs: appOptions.xArgs,
             }
             appLogger.LogInfo("attempting to convert video", { file: f, commandID, videoConvertOptions: videoConvertOptions })
             outputWriter.writeLine(`file: ${videoConvertOptions.sourceFileFullPath}`);
