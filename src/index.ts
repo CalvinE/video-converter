@@ -12,6 +12,8 @@ import { bytesToHumanReadableBytes, millisecondsToHHMMSS } from './PrettyPrint';
 const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
 const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
 const FFMPEG_CURRENT_FRAME_REGEX = /frame=\s*(?<framenumber>\d+)/;
+const FFMPEG_CURRENT_TIME_REGEX = /time=\s*(?<duration>\d+\.?\d*)/;
+const WRITE_PRETTY_JOB_FILE = true;
 
 const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
 
@@ -64,10 +66,11 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             appOutputWriter.write(`reading job data from ${appOptions.jobFile}`);
             // const jobFileData = fileManager.readFile(appOptions.jobFile);
             // jobs = JSON.parse(jobFileData);
-            jobFileManager = new JobFileManager(appLogger, fileManager, appOptions.jobFile);
+            jobFileManager = new JobFileManager(appLogger, fileManager, appOptions.jobFile, WRITE_PRETTY_JOB_FILE);
         } else {
             // we need to make the jobs based on appOptions
-            appLogger.LogInfo("writing new job file because job file value does not exist in fs", { jobFile: appOptions.jobFile })
+            appLogger.LogInfo("writing new job file because job file value does not exist in fs", { jobFile: appOptions.jobFile });
+            appOutputWriter.writeLine(`writing job file to ${appOptions.jobFile}`)
             let subCommand: SubCommand = INVALID;
             if (appOptions.convertVideo === true) {
                 appLogger.LogDebug("convert flag found", {});
@@ -80,7 +83,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             appOutputWriter.writeLine(`enumerating directory: ${appOptions.sourcePath}`);
             const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
             const jobs = getAllJobs(appLogger, subCommand, sourcePathContents, appOptions);
-            jobFileManager = new JobFileManager(appLogger, fileManager, appOptions.jobFile, {
+            jobFileManager = new JobFileManager(appLogger, fileManager, appOptions.jobFile, WRITE_PRETTY_JOB_FILE, {
                 jobID: getJobID(),
                 durationMilliseconds: 0,
                 numCompletedJobs: 0,
@@ -108,9 +111,11 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appOutputWriter.writeLine(`found ${jobFileData.jobs?.length} jobs based on parameters`);
         let totalSizeReduction = 0;
         const startTimeMilliseconds = Date.now();
+        const numJobs = jobFileData.jobs.length
         let successfulJobs = 0;
-        let failedJobs = 0;
+        let failedJobs = 0; let i = 0;
         for (const job of jobFileData.jobs) {
+            i++;
             if (job.state === "running" || job.state === "error") {
                 // a job was started, so we need to clean up the what files may have been created
                 appLogger.LogInfo(`attempting to restart job`, { job });
@@ -123,16 +128,17 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                     fileManager.safeUnlinkFile(job.targetFileFullPath);
                 }
                 job.state = "pending";
+                jobFileManager.updateJob(job);
             } else if (job.state === "completed") {
                 // skip the job its already done...
                 appLogger.LogInfo("job is already completed... skipping...", { commandID: job.commandID, task: job.task, sourceFile: job.fileInfo.fullPath });
                 appLogger.LogVerbose("previously completed job data", { job });
-                appOutputWriter.writeLine(`previous completed job ${job.commandID}... see logs for details.`);
+                appOutputWriter.writeLine(`previously completed job ${job.commandID}... see logs for details.`);
                 continue;
             }
             // pending is the only other state?
             appLogger.LogInfo("starting job", { commandID: job.commandID });
-            appOutputWriter.writeLine(`starting job ${job.commandID} - ${job.task}`)
+            appOutputWriter.writeLine(`starting job ${i} of ${numJobs} ${job.commandID} - ${job.task}`)
             appLogger.LogDebug("job options", { job });
             let success = false
             let durationMilliseconds = 0;
@@ -206,6 +212,8 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                 job.failureReason = `${err}`;
                 appOutputWriter.writeLine(`an error occurred while processing job ${job.commandID}`);
                 appOutputWriter.writeLine(`error: ${job.failureReason}`);
+            } finally {
+                jobFileManager.updateJob(job);
             }
         }
         // add a line to make it easier to read.
@@ -400,41 +408,99 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         return numberOfFramesNumber;
     }
 
-    function buildConvertOutputHandler(logger: ILogger, outputWriter: IOutputWriter, commandID: string, numberOfFrames: number): (args: CommandStdErrMessageReceivedEventData) => void {
-        const hasNumberOfFrames = (numberOfFrames ?? -1) >= 1;
-        const outputWriterSupportsProgressiveUpdates = hasNumberOfFrames && outputWriter.supportsProgressiveUpdates();
-        if (!hasNumberOfFrames) {
-            logger.LogDebug("could not determine number of frames in video. progressive updates cancelled.", { commandID, numberOfFrames });
-        } else {
-            logger.LogDebug("parsed out number of frames. progressive updated will be provided.", { commandID, numberOfFrames });
-        }
+    function parseTotalDuration(videoInfo?: VideoGetInfoResult): number {
+        const totalDuration = videoInfo?.videoInfo?.format?.duration;
+        const totalDurationNumber = parseInt(totalDuration ?? "-1", 10);
+        return totalDurationNumber;
+    }
+
+    function noopProgressiveUpdate(): (args: CommandStdErrMessageReceivedEventData) => void {
+        // lets show that something is happening...
+        return () => {
+            return;
+        };
+    }
+
+    function naiveProgressiveUpdate(_logger: ILogger, outputWriter: IOutputWriter, commandID: string): (args: CommandStdErrMessageReceivedEventData) => void {
+        // lets show that something is happening...
         let messageCount = 0;
         return (args: CommandStdErrMessageReceivedEventData) => {
             if (args.commandId == commandID) {
-                if (hasNumberOfFrames && outputWriterSupportsProgressiveUpdates) {
-                    logger.LogVerbose("constructing progressive update line", { commandID, message: args.commandMessage })
-                    // This is our current command we should do something with it?
-                    const regexMatch = args.commandMessage.match(FFMPEG_CURRENT_FRAME_REGEX);
-                    const currentFrame = regexMatch?.groups?.framenumber;
-                    logger.LogVerbose("current frame found", { commandID, currentFrame, numberOfFrames })
-                    if (currentFrame) {
-                        const currentFrameNumber = parseInt(currentFrame, 10);
-                        const pctDone = Math.floor(currentFrameNumber / numberOfFrames * 100);
-                        const numMarkers = Math.floor(pctDone / 5);
-                        logger.LogVerbose("percent done calculated", { commandID, numberOfFrames, currentFrame, currentFrameNumber, pctDone, numMarkers });
-                        const arrow = `${"=".repeat(numMarkers ?? 0)}>`.padEnd(20, " ")
-                        const progressiveUpdate = `|${arrow}| %${pctDone}`.padEnd(PROGRESSIVE_UPDATE_CHAR_WIDTH, " ");
-                        outputWriter.write(`${progressiveUpdate}\r`);
-                    }
-                } else {
-                    // lets show that something is happening...
-                    if (messageCount % 10 === 0) {
-                        outputWriter.write(".");
-                    }
-                    messageCount++;
+                if (messageCount % 10 === 0) {
+                    outputWriter.write(".");
+                }
+                messageCount++;
+            }
+            return;
+        }
+    }
+
+    function frameCountBasedProgressiveUpdate(logger: ILogger, outputWriter: IOutputWriter, commandID: string, totalNumberOfFrames: number): (args: CommandStdErrMessageReceivedEventData) => void {
+        return (args: CommandStdErrMessageReceivedEventData) => {
+            if (args.commandId === commandID) {
+                const regexMatch = args.commandMessage.match(FFMPEG_CURRENT_FRAME_REGEX);
+                const currentFrameString = regexMatch?.groups?.framenumber;
+                logger.LogVerbose("current frame found", { commandID, currentFrame: currentFrameString, numberOfFrames: totalNumberOfFrames })
+                if (currentFrameString) {
+                    const progressiveUpdate = makeProgressiveUpdateLine(logger, commandID, currentFrameString, totalNumberOfFrames);
+                    outputWriter.write(`${progressiveUpdate}\r`);
                 }
             }
         }
+    }
+
+    function durationCountBasedProgressiveUpdate(logger: ILogger, outputWriter: IOutputWriter, commandID: string, totalDuration: number): (args: CommandStdErrMessageReceivedEventData) => void {
+        return (args: CommandStdErrMessageReceivedEventData) => {
+            if (args.commandId === commandID) {
+                const regexMatch = args.commandMessage.match(FFMPEG_CURRENT_TIME_REGEX);
+                const currentDurationString = regexMatch?.groups?.duration;
+                logger.LogVerbose("current duration found", { commandID, currentFrame: currentDurationString, numberOfFrames: totalDuration })
+                if (currentDurationString) {
+                    const progressiveUpdate = makeProgressiveUpdateLine(logger, commandID, currentDurationString, totalDuration);
+                    outputWriter.write(`${progressiveUpdate}\r`);
+                }
+            }
+        }
+    }
+
+    function makeProgressiveUpdateLine(logger: ILogger, commandID: string, currentValueString: string, totalValue: number): string {
+        const currentValueNumber = parseInt(currentValueString, 10);
+        const pctDone = Math.floor(currentValueNumber / totalValue * 100);
+        const numMarkers = Math.floor(pctDone / 5);
+        logger.LogVerbose("percent done calculated", { commandID, totalValue, currentValueString, currentValueNumber, pctDone, numMarkers });
+        const arrow = `${"=".repeat(numMarkers ?? 0)}>`.padEnd(20, " ")
+        const progressiveUpdate = `|${arrow}| %${pctDone}`.padEnd(PROGRESSIVE_UPDATE_CHAR_WIDTH, " ");
+        return progressiveUpdate;
+    }
+
+    function buildConvertOutputHandler(logger: ILogger, outputWriter: IOutputWriter, commandID: string, numberOfFrames?: number, totalDuration?: number): (args: CommandStdErrMessageReceivedEventData) => void {
+        const doProgressiveUpdates = outputWriter.supportsProgressiveUpdates();
+        let makeProgressiveUpdateFunction: (args: CommandStdErrMessageReceivedEventData) => void;
+        if (!doProgressiveUpdates) {
+            // default to noop updated
+            logger.LogDebug("disabling progressive updated because the output writer does not support progressive updates.", { numberOfFrames, totalDuration, commandID });
+            makeProgressiveUpdateFunction = noopProgressiveUpdate();
+        } else if (totalDuration !== undefined) {
+            if (totalDuration <= 0) {
+                logger.LogWarn("duration based progressive updates are broken because we have an invalid number of frames. resorting to naive updates.", { numberOfFrames, totalDuration, commandID });
+                makeProgressiveUpdateFunction = naiveProgressiveUpdate(logger, outputWriter, commandID);
+            } else {
+                logger.LogDebug("video duration is available. setting progressive updates to duration based updates.", { numberOfFrames, totalDuration, commandID });
+                makeProgressiveUpdateFunction = durationCountBasedProgressiveUpdate(logger, outputWriter, commandID, totalDuration);
+            }
+        } else if (numberOfFrames !== undefined) {
+            if (numberOfFrames <= 0) {
+                logger.LogWarn("frame base progressive updates are broken because we have an invalid number of frames. resorting to naive updates.", { numberOfFrames, totalDuration, commandID });
+                makeProgressiveUpdateFunction = naiveProgressiveUpdate(logger, outputWriter, commandID);
+            } else {
+                logger.LogDebug("video total frame count is available. setting progressive updates to current frame based updates.", { numberOfFrames, totalDuration, commandID });
+                makeProgressiveUpdateFunction = frameCountBasedProgressiveUpdate(logger, outputWriter, commandID, numberOfFrames);
+            }
+        } else {
+            logger.LogDebug("no data available for progressive updates. resorting to naive updates", { numberOfFrames, totalDuration, commandID });
+            makeProgressiveUpdateFunction = naiveProgressiveUpdate(logger, outputWriter, commandID);
+        }
+        return makeProgressiveUpdateFunction;
     }
 
     async function processVideoConvertCommand(logger: ILogger, outputWriter: IOutputWriter, job: ConvertJob): Promise<VideoConvertResult> {
@@ -450,7 +516,8 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appOutputWriter.writeLine(`converting file: ${job.fileInfo.fullPath}`);
         const convertPromise = ffmpegVideoConverter.convertVideo(job.fileInfo, job.options);
         const numberOfFrames = parseNumberOfFrames(videoInfoResult ?? {});
-        const outputHandler = buildConvertOutputHandler(logger, outputWriter, job.commandID, numberOfFrames);
+        const totalDuration = parseTotalDuration(videoInfoResult ?? {});
+        const outputHandler = buildConvertOutputHandler(logger, outputWriter, job.commandID, numberOfFrames, totalDuration);
         ffmpegVideoConverter.on(VideoConverterEventName_StdErrMessageReceived, outputHandler);
         const convertResult = await convertPromise
         ffmpegVideoConverter.off(VideoConverterEventName_StdErrMessageReceived, outputHandler);

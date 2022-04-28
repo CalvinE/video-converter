@@ -39,13 +39,15 @@ export class JobFileManager implements IJobFileManager {
     private _writeInterval: NodeJS.Timer;
     private _isDirty: boolean;
     private _hasUncommittedWrites: boolean;
+    private _pretty: boolean;
 
-    constructor(logger: ILogger, fileManager: IFileManager, jobFilePath: string, initialJobFileData?: JobFile) {
+    constructor(logger: ILogger, fileManager: IFileManager, jobFilePath: string, pretty = false, initialJobFileData?: JobFile) {
         this._logger = logger;
         this._fileManager = fileManager;
         this._jobFileFullPath = resolve(jobFilePath);
         this._isDirty = false;
         this._hasUncommittedWrites = false;
+        this._pretty = pretty;
         if (existsSync(this._jobFileFullPath)) {
             const fileStats = lstatSync(this._jobFileFullPath);
             if (!fileStats.isFile()) {
@@ -85,19 +87,21 @@ export class JobFileManager implements IJobFileManager {
         this._logger.LogDebug("updating job file statistics", {});
         if (job.result != undefined) {
             if (job.task === "convert") {
-                this._jobFileData.totalSizeReductionBytes += job.result.sizeDifference;
+                this._jobFileData.totalSizeReductionBytes += job.result?.sizeDifference ?? 0;
                 this._jobFileData.prettyTotalReduction = bytesToHumanReadableBytes(this._jobFileData.totalSizeReductionBytes);
-                this._jobFileData.durationMilliseconds += job.result.duration;
+                this._jobFileData.durationMilliseconds += job.result?.duration ?? 0;
                 this._jobFileData.prettyDuration = millisecondsToHHMMSS(this._jobFileData.durationMilliseconds);
             } else if (job.task === "getinfo") {
-                this._jobFileData.durationMilliseconds += job.result.duration;
+                this._jobFileData.durationMilliseconds += job.result?.duration ?? 0;
                 this._jobFileData.prettyDuration = millisecondsToHHMMSS(this._jobFileData.durationMilliseconds);
             } // FIXME: handle copy jobs to add their duration too...
         }
         if (job.state === "completed") {
-            this._jobFileData.numCompletedJobs++;
+            // FIXME: this seems inefficient... find a better way t do this and account for jobs being restarted
+            this._jobFileData.numCompletedJobs = this._jobFileData.jobs.reduce((prev, job) => prev + job.state === "completed" ? 1 : 0, 0);
         } else if (job.state === "error") {
-            this._jobFileData.numFailedJobs++;
+            // FIXME: this seems inefficient... find a better way t do this and account for jobs being restarted
+            this._jobFileData.numFailedJobs = this._jobFileData.jobs.reduce((prev, job) => prev + job.state === "error" ? 1 : 0, 0);
         }
     }
 
@@ -120,7 +124,7 @@ export class JobFileManager implements IJobFileManager {
     public writeJobFileData(): void {
         if (this._hasUncommittedWrites === true) {
             this._logger.LogDebug("writing job file data from file", { jobFileFullPath: this._jobFileFullPath, hasUncommittedWrites: this._hasUncommittedWrites })
-            this._fileManager.writeFile(this._jobFileFullPath, JSON.stringify(this._jobFileData), true);
+            this._fileManager.writeFile(this._jobFileFullPath, JSON.stringify(this._jobFileData, undefined, this._pretty ? 2 : 0), true);
             this._hasUncommittedWrites = false;
             this._logger.LogDebug("clearing dirty flag for write cache", { hasUncommittedWrites: this._hasUncommittedWrites })
         } else {
