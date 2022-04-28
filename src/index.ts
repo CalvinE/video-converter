@@ -1,5 +1,5 @@
 import { join, resolve } from 'path';
-import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJob, GetInfoJob, CopyJob, INVALID } from './VideoConverter/models';
+import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJob, GetInfoJob, CopyJob, INVALID, JobsArray } from './VideoConverter/models';
 import { IOutputWriter } from './OutputWriter/models';
 import { ConsoleOutputWriter } from './OutputWriter/ConsoleOutputWriter';
 import { FileManager, FSItem, FileInfo } from './FileManager';
@@ -56,7 +56,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appLogger.LogDebug("ffmpeg and ffprobe found on system", { commandCheckResult });
         appOutputWriter.writeLine("ffmpeg and ffprobe found on system");
 
-        let jobs: Array<ConvertJob | GetInfoJob | CopyJob> = [];
+        let jobs: JobsArray = [];
         if (appOptions.jobFile !== "") {
             // we are reading from a job file, so no need to parse other args and create jobs,
             appLogger.LogInfo("reading job data from file", { targetJobFile: appOptions.jobFile });
@@ -329,10 +329,10 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         throw error;
     }
 
-    function getAllJobs(logger: ILogger, subCommand: SubCommand, items: FSItem[], options: AppOptions,): Array<ConvertJob | GetInfoJob | CopyJob> {
+    function getAllJobs(logger: ILogger, subCommand: SubCommand, items: FSItem[], options: AppOptions,): JobsArray {
         logger.LogDebug("getting all files based on parameters", { targetFileNameRegex: options.targetFileNameRegex?.source, allowedFileExtensions: options.allowedFileExtensions })
         const allowCopy = !options.saveInPlace;
-        const jobs: Array<ConvertJob | GetInfoJob | CopyJob> = [];
+        const jobs: JobsArray = [];
         for (const item of items) {
             if (item.type === "file") {
                 if (doesFileMatchCriteria(logger, item, subCommand, options.allowedFileExtensions, options.targetFileNameRegex)) {
@@ -348,7 +348,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                     logger.LogDebug("file name does not match the selection criteria", { fileName: item.name });
                 }
             } else if (item.type === 'directory') {
-                const subItems: Array<ConvertJob | GetInfoJob | CopyJob> = getAllJobs(logger, subCommand, item.files, options);
+                const subItems: JobsArray = getAllJobs(logger, subCommand, item.files, options);
                 jobs.push(...subItems);
             }
         }

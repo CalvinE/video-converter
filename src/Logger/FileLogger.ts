@@ -1,6 +1,7 @@
 import { BaseStructuredLogger, LogLevel } from './Logger';
 import { createWriteStream, WriteStream, mkdirSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
+import { dateToFileSafeDate } from '../PrettyPrint';
 
 export class FileLogger extends BaseStructuredLogger {
     private _writeStream: WriteStream;
@@ -14,15 +15,7 @@ export class FileLogger extends BaseStructuredLogger {
                 recursive: true
             });
         }
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = `${now.getMonth() + 1}`.padStart(2, '0');
-        const day =`${now.getDate()}`.padStart(2, '0');
-        const hour = `${now.getHours()}`.padStart(2, '0');
-        const minute = `${now.getMinutes()}`.padStart(2, '0');
-        const second = `${now.getSeconds()}`.padStart(2, '0');
-        // const millisecond = `${now.getMilliseconds()}`.padStart(2, '0');
-        const logFileName = `${year}${month}${day}${hour}${minute}${second}-video-converter.log`;
+        const logFileName = `${dateToFileSafeDate(new Date())}-video-converter.log`;
         this.fullLogFilePath = resolve(join(logFilePath, logFileName));
         this._writeStream = createWriteStream(this.fullLogFilePath, {
             encoding: "utf8",
@@ -30,8 +23,8 @@ export class FileLogger extends BaseStructuredLogger {
         this._stringifySpaces = pretty ? 2 : 0;
     }
 
-    
-    
+
+
     public shutdown(): Promise<void> {
         return new Promise((resolve) => {
             this._writeStream.end(() => {

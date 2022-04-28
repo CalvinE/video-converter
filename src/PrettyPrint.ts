@@ -3,6 +3,18 @@ const billion = 1_000_000_000;
 const million = 1_000_000;
 const thousand = 1_000;
 
+export function dateToFileSafeDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    const hour = `${date.getHours()}`.padStart(2, '0');
+    const minute = `${date.getMinutes()}`.padStart(2, '0');
+    const second = `${date.getSeconds()}`.padStart(2, '0');
+    // const millisecond = `${now.getMilliseconds()}`.padStart(2, '0');
+    const dateString = `${year}${month}${day}${hour}${minute}${second}`;
+    return dateString;
+}
+
 export function millisecondsToHHMMSS(ms: number): string {
     const hours = Math.floor(ms / 1000 / 60 / 60);
     const minutes = Math.floor((ms / 1000 / 60 / 60 - hours) * 60);

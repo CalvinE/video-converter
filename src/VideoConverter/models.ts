@@ -45,6 +45,19 @@ export type CopyJob = BaseJob & {
   result?: boolean;
 };
 
+export type JobsArray = Array<CopyJob | ConvertJob | GetInfoJob>;
+
+export type JobsFile = {
+  jobs: JobsArray;
+  numJobs: number;
+  numCompletedJobs: number;
+  numFailedJobs: number;
+  totalSizeReductionBytes: number;
+  prettyTotalReduction: string;
+  durationMilliseconds: number;
+  prettyDuration: string;
+}
+
 export const VideoContainerFormat_MP4 = "mp4";
 export const VideoContainerFormat_MOV = "mov";
 export const VideoContainerFormat_AVI = "avi";
