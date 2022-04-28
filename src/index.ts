@@ -1,6 +1,5 @@
-import { writeFileSync } from 'fs';
 import { IJobFileManager, JobFileManager } from './JobFileManager';
-import { dirname, join, resolve } from 'path';
+import { join, resolve } from 'path';
 import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJob, GetInfoJob, CopyJob, INVALID, JobsArray, getJobID } from './VideoConverter/models';
 import { IOutputWriter } from './OutputWriter/models';
 import { ConsoleOutputWriter } from './OutputWriter/ConsoleOutputWriter';
