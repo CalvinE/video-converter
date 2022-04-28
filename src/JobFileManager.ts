@@ -58,9 +58,10 @@ export class JobFileManager implements IJobFileManager {
             // must be a new job?
             // ensure directory for file exists
             this._logger.LogInfo("writing new job file because file provided does not exist", { jobFilePath });
-            this._logger.LogVerbose("initial job data", { initialJobFileData })
+            this._logger.LogVerbose("initial job data", { initialJobFileData });
             this._fileManager.makeDir(dirname(this._jobFileFullPath));
-            this._jobFileData = initialJobFileData
+            this._jobFileData = initialJobFileData;
+            this._hasUncommittedWrites = true;
             this.writeJobFileData();
         } else {
             throw new ErrorMissingJobFileData(jobFilePath);

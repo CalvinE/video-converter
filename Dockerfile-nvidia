@@ -4,6 +4,8 @@ VOLUME [ "/source" ]
 
 VOLUME [ "/result" ]
 
+VOLUME [ "/root/video-converter/output" ]
+
 # eww I know gross...
 WORKDIR /root
 
