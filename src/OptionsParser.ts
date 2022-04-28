@@ -1,6 +1,8 @@
 import { VideoContainerFormat, AudioEncoder, VideoEncoder, INVALID } from './VideoConverter/models';
 import { argv, stdout } from "process";
 import { EOL } from "os";
+import { dateToFileSafeDate } from './PrettyPrint';
+import { join } from 'path';
 
 const DEFAULT_APPROVED_FILE_EXTENSIONS: string[] = [".mp4", ".mkv", ".avi", ".mov"];
 // const DEFAULT_FILES_TO_COPY: string[] = [".jpg", ".srt"];
@@ -19,8 +21,8 @@ const COPY_RELATIVE_FOLDER_PATHS = "copyRelativeFolderPath";
 const SAVE_IN_PLACE = "saveInPlace";
 const GET_INFO_OPTION_NAME = "getInfo";
 const CONVERT_VIDEO_OPTION_NAME = "convertVideo";
-const SAVE_JOB_FILE_OPTION_NAME = "saveJobFile";
-const READ_JOB_FILE_OPTION_NAME = "jobFile";
+const SAVE_JOB_FILE_ONLY_OPTION_NAME = "saveJobFileOnly";
+const JOB_FILE_PATH_OPTION_NAME = "jobFile";
 const X_ARGS_OPTION_NAME = "xArgs"
 const HELP_OPTION_NAME = "help";
 
@@ -39,8 +41,8 @@ export type AppOptions = {
     [SAVE_IN_PLACE]: boolean;
     [GET_INFO_OPTION_NAME]: boolean;
     [CONVERT_VIDEO_OPTION_NAME]: boolean;
-    [SAVE_JOB_FILE_OPTION_NAME]: string;
-    [READ_JOB_FILE_OPTION_NAME]: string;
+    [SAVE_JOB_FILE_ONLY_OPTION_NAME]: boolean;
+    [JOB_FILE_PATH_OPTION_NAME]: string;
     [X_ARGS_OPTION_NAME]: string[];
     [HELP_OPTION_NAME]: boolean;
 }
@@ -64,13 +66,13 @@ export function ParseOptions(): AppOptions {
         targetContainerFormat: "copy",
         targetAudioEncoder: "copy",
         targetVideoEncoder: "copy",
-        savePath: "./video-converter-output",
+        savePath: join(".", "output", "video-converter-output"),
         saveInPlace: false,
         copyRelativeFolderPath: false,
         getInfo: false,
         convertVideo: false,
-        saveJobFile: "",
-        jobFile: "",
+        saveJobFileOnly: false,
+        jobFile: join(".", "output", "jobs", `${dateToFileSafeDate(new Date())}-video-converter-job.json`),
         xArgs: [],
         help: false,
     };
@@ -153,7 +155,7 @@ export function ParseOptions(): AppOptions {
                 }
                 break;
             case SAVE_PATH_OPTION_NAME:
-                options[SAVE_PATH_OPTION_NAME] = argv[++i] ?? "";
+                options[SAVE_PATH_OPTION_NAME] = argv[++i];
                 break;
             case SAVE_IN_PLACE:
                 options[SAVE_IN_PLACE] = true;
@@ -167,11 +169,11 @@ export function ParseOptions(): AppOptions {
             case CONVERT_VIDEO_OPTION_NAME:
                 options[CONVERT_VIDEO_OPTION_NAME] = true;
                 break;
-            case SAVE_JOB_FILE_OPTION_NAME:
-                options[SAVE_JOB_FILE_OPTION_NAME] = argv[++i];
+            case SAVE_JOB_FILE_ONLY_OPTION_NAME:
+                options[SAVE_JOB_FILE_ONLY_OPTION_NAME] = true;
                 break;
-            case READ_JOB_FILE_OPTION_NAME:
-                options[READ_JOB_FILE_OPTION_NAME] = argv[++i];
+            case JOB_FILE_PATH_OPTION_NAME:
+                options[JOB_FILE_PATH_OPTION_NAME] = argv[++i];
                 break;
             default:
                 // If we get here we did something wrong... print help and return?
@@ -250,12 +252,12 @@ export function PrintHelp() {
                 description: "A flag. When present will convert video files based on options provided.",
             },
             {
-                name: SAVE_JOB_FILE_OPTION_NAME,
-                description: `A path where the app will create an initial job file that can be loaded later with. --${READ_JOB_FILE_OPTION_NAME}`,
+                name: SAVE_JOB_FILE_ONLY_OPTION_NAME,
+                description: `A flag. when present the job file will be saved to the value of the ${JOB_FILE_PATH_OPTION_NAME} option, and the program will exit without performing the job.`,
             },
             {
-                name: READ_JOB_FILE_OPTION_NAME,
-                description: `A path to a job file. This allows the app to resume previous jobs if its state was saved. Job file scan be produced with the --${SAVE_JOB_FILE_OPTION_NAME} flag.`,
+                name: JOB_FILE_PATH_OPTION_NAME,
+                description: `A path to a json job file. if none is provided a default will be generated. If the file provided does not exist it will be created and populated based on the other options provided.`,
             },
             {
                 name: X_ARGS_OPTION_NAME,

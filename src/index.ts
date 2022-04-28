@@ -1,5 +1,7 @@
-import { join, resolve } from 'path';
-import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJob, GetInfoJob, CopyJob, INVALID, JobsArray } from './VideoConverter/models';
+import { writeFileSync } from 'fs';
+import { IJobFileManager, JobFileManager } from './JobFileManager';
+import { dirname, join, resolve } from 'path';
+import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJob, GetInfoJob, CopyJob, INVALID, JobsArray, getJobID } from './VideoConverter/models';
 import { IOutputWriter } from './OutputWriter/models';
 import { ConsoleOutputWriter } from './OutputWriter/ConsoleOutputWriter';
 import { FileManager, FSItem, FileInfo } from './FileManager';
@@ -16,9 +18,8 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
 
 /* 
     TODO: list
+    * make a function to create output folders, so the parent directory is all in one place...
     * Improve code here so there is not so much in one place to try and read...
-    * produce a stats object we can write to another file?
-    * Have a job state file so jobs can be resumed if cancelled.
     * handle signals to cancel the command properly like ???
     * Have a file name alteration function replace certain string with others, etc...
     * write *better* help info...
@@ -27,13 +28,14 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
 */
 
 (async function () {
-    const appOptions: AppOptions = ParseOptions();
+    let appOptions: AppOptions = ParseOptions();
     // const logger: ILogger = new PrettyJSONConsoleLogger("verbose");
-    const appLogger: ILogger = new FileLogger("verbose", "./logs", true);
+    const appLogger: ILogger = new FileLogger("verbose", join(".", "output", "logs"), true);
     appLogger.LogDebug("application starting", { appOptions })
     const appOutputWriter: IOutputWriter = new ConsoleOutputWriter();
     await appOutputWriter.initialize()
     const fileManager = new FileManager(appLogger);
+
     const ffmpegVideoConverter = new FFMPEGVideoConverter("ffmpeg", "ffprobe", appLogger, fileManager);
     try {
         if (appOptions.help === true) {
@@ -56,15 +58,17 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appLogger.LogDebug("ffmpeg and ffprobe found on system", { commandCheckResult });
         appOutputWriter.writeLine("ffmpeg and ffprobe found on system");
 
-        let jobs: JobsArray = [];
-        if (appOptions.jobFile !== "") {
+        let jobFileManager: IJobFileManager;
+        if (fileManager.exists(appOptions.jobFile)) {
             // we are reading from a job file, so no need to parse other args and create jobs,
             appLogger.LogInfo("reading job data from file", { targetJobFile: appOptions.jobFile });
             appOutputWriter.write(`reading job data from ${appOptions.jobFile}`);
-            const jobFileData = fileManager.readFile(appOptions.jobFile);
-            jobs = JSON.parse(jobFileData);
+            // const jobFileData = fileManager.readFile(appOptions.jobFile);
+            // jobs = JSON.parse(jobFileData);
+            jobFileManager = new JobFileManager(appLogger, fileManager, appOptions.jobFile);
         } else {
             // we need to make the jobs based on appOptions
+            appLogger.LogInfo("writing new job file because job file value does not exist in fs", { jobFile: appOptions.jobFile })
             let subCommand: SubCommand = INVALID;
             if (appOptions.convertVideo === true) {
                 appLogger.LogDebug("convert flag found", {});
@@ -76,23 +80,38 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             appLogger.LogInfo("enumerating source path", { sourcePath: appOptions.sourcePath });
             appOutputWriter.writeLine(`enumerating directory: ${appOptions.sourcePath}`);
             const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
-            jobs = getAllJobs(appLogger, subCommand, sourcePathContents, appOptions);
-            if (appOptions.saveJobFile !== "") {
-                appLogger.LogInfo("saving job file", { savedJobFile: appOptions.saveJobFile });
-                appOutputWriter.write(`saving ${jobs?.length} jobs to ${appOptions.saveJobFile}`);
-                const fileJobData = JSON.stringify(jobs);
-                fileManager.writeFile(appOptions.saveJobFile, fileJobData, true);
+            const jobs = getAllJobs(appLogger, subCommand, sourcePathContents, appOptions);
+            jobFileManager = new JobFileManager(appLogger, fileManager, appOptions.jobFile, {
+                jobID: getJobID(),
+                durationMilliseconds: 0,
+                numCompletedJobs: 0,
+                numFailedJobs: 0,
+                numJobs: jobs.length,
+                jobs,
+                options: appOptions,
+                prettyDuration: millisecondsToHHMMSS(0),
+                prettyTotalReduction: bytesToHumanReadableBytes(0),
+                totalSizeReductionBytes: 0,
+            });
+            if (appOptions.saveJobFileOnly === true) {
+                appLogger.LogInfo("exiting because saveJobFile flag is present.", { savedJobFileOnly: appOptions.saveJobFileOnly });
+                appOutputWriter.write(`saving job file (${jobs.length} jobs) jobs to ${appOptions.jobFile}`);
                 return;
             }
         }
-        appLogger.LogInfo("jobs loaded", { numJobs: jobs.length });
-        appLogger.LogVerbose("listing all jobs", { jobs });
-        appOutputWriter.writeLine(`found ${jobs?.length} jobs based on parameters`);
+        appLogger.LogVerbose("processing jobs due to lack of saveJobFileOnly flag", { savedJobFileOnly: appOptions.saveJobFileOnly })
+        const jobFileData = jobFileManager.readJobFileData();
+        appLogger.LogVerbose("about to restore app options from job file", { oldAppOptions: appOptions });
+        appOptions = jobFileData.options;
+        appLogger.LogInfo("restoring app options from job file", { appOptions });
+        appLogger.LogInfo("jobs loaded", { numJobs: jobFileData.jobs.length });
+        appLogger.LogVerbose("listing all jobs data", { jobFileData });
+        appOutputWriter.writeLine(`found ${jobFileData.jobs?.length} jobs based on parameters`);
         let totalSizeReduction = 0;
         const startTimeMilliseconds = Date.now();
         let successfulJobs = 0;
         let failedJobs = 0;
-        for (const job of jobs) {
+        for (const job of jobFileData.jobs) {
             if (job.state === "running" || job.state === "error") {
                 // a job was started, so we need to clean up the what files may have been created
                 appLogger.LogInfo(`attempting to restart job`, { job });
@@ -196,7 +215,8 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         const durationMilliseconds = endTimeMilliseconds - startTimeMilliseconds;
         const prettyDuration = millisecondsToHHMMSS(durationMilliseconds);
         const prettyTotalSizeReduction = bytesToHumanReadableBytes(totalSizeReduction);
-        const totalJobs = jobs.length;
+        const totalJobs = jobFileData.jobs.length;
+        await jobFileManager.shutdownAndFlush();
         appLogger.LogInfo("all jobs finished", { prettyDuration, durationMilliseconds, prettyTotalSizeReduction, totalSizeReduction, successfulJobs, failedJobs, totalJobs })
         appOutputWriter.writeLine(`All jobs completed`);
         appOutputWriter.writeLine(`Run time: ${prettyDuration}`);
@@ -293,6 +313,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             return {
                 commandID,
                 fileInfo,
+                host: "local",
                 state: "pending",
                 task: "convert",
                 options: videoConvertOptions,
@@ -306,6 +327,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             return {
                 commandID,
                 fileInfo,
+                host: "local",
                 state: "pending",
                 task: "getinfo",
                 options: getVideoInfoOptions,
@@ -315,6 +337,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             return {
                 commandID,
                 fileInfo,
+                host: "local",
                 state: "pending",
                 task: "copy",
                 targetFileFullPath,

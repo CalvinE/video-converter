@@ -1,6 +1,6 @@
 import { ILogger } from './Logger/Logger';
 import { basename, dirname, extname, join, relative, resolve } from 'path';
-import fs, { copyFileSync, existsSync, lstatSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 
 type BaseFSItem = {
     fullPath: string;
@@ -48,6 +48,8 @@ export interface IFileManager {
     safeUnlinkFile: (targetFileFullPath: string) => void;
 
     unlinkFile: (targetFileFullPath: string) => void;
+
+    exists: (path: string) => boolean;
 }
 
 class ErrorDirectoryDoesNotExist extends Error {
@@ -85,6 +87,10 @@ export class FileManager implements IFileManager {
         this._logger = logger;
     }
 
+    public exists(path: string): boolean {
+        return existsSync(path);
+    }
+
     public unlinkFile(targetFileFullPath: string) {
         unlinkSync(targetFileFullPath)
     }
@@ -100,7 +106,7 @@ export class FileManager implements IFileManager {
     public writeFile(targetFilePath: string, content: string, truncate: boolean): void {
         const targetFileFullPath = resolve(targetFilePath);
         const targetFileParentDirectory = dirname(targetFileFullPath);
-        if (!existsSync(targetFileParentDirectory)) {
+        if (!this.exists(targetFileParentDirectory)) {
             this.makeDir(targetFileParentDirectory);
         }
         writeFileSync(targetFileFullPath, content, {
@@ -110,7 +116,7 @@ export class FileManager implements IFileManager {
     }
 
     public readFile(sourceFilePath: string): string {
-        if (!existsSync(sourceFilePath)) {
+        if (!this.exists(sourceFilePath)) {
             throw new ErrorItemDoesNotExist(sourceFilePath);
         }
         const fileStats = lstatSync(sourceFilePath);
@@ -124,7 +130,7 @@ export class FileManager implements IFileManager {
     }
 
     public copyFile(sourceFileFullPath: string, targetFileFullPath: string): boolean {
-        if (!existsSync(sourceFileFullPath)) {
+        if (!this.exists(sourceFileFullPath)) {
             throw new ErrorItemDoesNotExist(sourceFileFullPath);
         }
         const stats = lstatSync(sourceFileFullPath);
@@ -132,7 +138,7 @@ export class FileManager implements IFileManager {
             throw new ErrorIsNotFile(sourceFileFullPath);
         }
         const targetFileParentDir = dirname(targetFileFullPath);
-        if (!existsSync(targetFileParentDir)) {
+        if (!this.exists(targetFileParentDir)) {
             const wasMade = this.makeDir(targetFileParentDir);
             if (!wasMade) {
                 throw new ErrorDirectoryDoesNotExist(targetFileParentDir);
@@ -145,15 +151,15 @@ export class FileManager implements IFileManager {
 
     public makeDir(targetDir: string): boolean {
         let success = false;
-        const alreadyExists = fs.existsSync(targetDir);
+        const alreadyExists = this.exists(targetDir);
         if (!alreadyExists) {
             this._logger.LogVerbose("directory did not already exist, so we are creating it", { targetDir });
-            fs.mkdirSync(targetDir, {
+            mkdirSync(targetDir, {
                 recursive: true,
             });
             success = true;
         } else {
-            const existingStats = fs.lstatSync(targetDir);
+            const existingStats = lstatSync(targetDir);
             if (!existingStats.isDirectory()) {
                 const err = new ErrorIsNotDirectory(targetDir);
                 this._logger.LogError("targetDir provided is not a directory...", err, { targetDir })
@@ -167,7 +173,7 @@ export class FileManager implements IFileManager {
     public enumerateDirectory(directory: string, maxRecursiveDepth = 0, originalDirectory?: string): FSItem[] {
         // does it exist
         this._logger.LogDebug("attempting to enumerate directory", { directory, maxRecursiveDepth });
-        const exists = fs.existsSync(directory);
+        const exists = this.exists(directory);
         if (!exists) {
             const err = new ErrorDirectoryDoesNotExist(directory);
             this._logger.LogError("directory does not exist", err, { directory });
@@ -181,7 +187,7 @@ export class FileManager implements IFileManager {
             throw err;
         }
         // get directory contents
-        const contents = fs.readdirSync(directory);
+        const contents = readdirSync(directory);
         this._logger.LogDebug("found contents of directory", { directory, numItems: contents.length, maxRecursiveDepth });
         // if recursive loop over stuff and go in directories
         for (const item of contents) {
@@ -203,7 +209,7 @@ export class FileManager implements IFileManager {
     }
 
     public getFSItemFromPath(itemPath: string, basePath = "."): FSItem {
-        const stats = fs.lstatSync(itemPath);
+        const stats = lstatSync(itemPath);
         const baseFSInfo = this.getBaseFSInfoFromPath(itemPath, basePath);
         if (stats.isDirectory()) {
             return {

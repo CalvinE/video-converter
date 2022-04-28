@@ -15,13 +15,9 @@ export type Task = SubCommand | `${typeof COPY}`;
 
 export type State = "pending" | "running" | "completed" | "error";
 
-export type JobFile = {
-  options: AppOptions;
-  jobs: ConvertJob | GetInfoJob | CopyJob[];
-}
-
 export type BaseJob = {
   commandID: string;
+  host: string;
   failureReason?: string;
   fileInfo: FileInfo;
   state: State;
@@ -47,7 +43,9 @@ export type CopyJob = BaseJob & {
 
 export type JobsArray = Array<CopyJob | ConvertJob | GetInfoJob>;
 
-export type JobsFile = {
+export type JobFile = {
+  jobID: string;
+  options: AppOptions;
   jobs: JobsArray;
   numJobs: number;
   numCompletedJobs: number;
@@ -183,6 +181,10 @@ export function getConvertVideoCommandID(): string {
 
 export function getJobCommandID(task: Task): string {
   return `${task}-${randomUUID()}`
+}
+
+export function getJobID(): string {
+  return `job-${randomUUID()}`
 }
 
 export type VideoInfo = {
