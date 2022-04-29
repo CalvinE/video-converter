@@ -91,6 +91,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                 durationMilliseconds: 0,
                 numCompletedJobs: 0,
                 numFailedJobs: 0,
+                failedJobIDs: [],
                 numJobs: jobs.length,
                 prettyDuration: millisecondsToHHMMSS(0),
                 prettyTotalReduction: bytesToHumanReadableBytes(0),

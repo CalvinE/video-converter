@@ -54,6 +54,7 @@ export type JobFile = {
   prettyTotalReduction: string;
   durationMilliseconds: number;
   prettyDuration: string;
+  failedJobIDs: string[];
 }
 
 export const VideoContainerFormat_MP4 = "mp4";

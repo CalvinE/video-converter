@@ -97,18 +97,21 @@ export class JobFileManager implements IJobFileManager {
             } else if (job.task === "getinfo") {
                 this._jobFileData.durationMilliseconds += job.result?.duration ?? 0;
                 this._jobFileData.prettyDuration = millisecondsToHHMMSS(this._jobFileData.durationMilliseconds);
-            } // FIXME: handle copy jobs to add their duration too...
+            }
         }
         if (job.state == 'completed' || job.state == 'error') {
+            const failedJobIds: string[] = [];
             let completedCount = 0;
             let failedCount = 0;
             for (const j of this._jobFileData.jobs) {
                 if (j.state === "completed") {
                     completedCount++;
                 } else if (j.state === "error") {
+                    failedJobIds.push(j.commandID);
                     failedCount++;
                 }
             }
+            this._jobFileData.failedJobIDs = failedJobIds;
             this._jobFileData.numCompletedJobs = completedCount;
             this._jobFileData.numFailedJobs = failedCount;
         }
