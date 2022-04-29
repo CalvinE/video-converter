@@ -223,7 +223,6 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         const prettyDuration = millisecondsToHHMMSS(durationMilliseconds);
         const prettyTotalSizeReduction = bytesToHumanReadableBytes(totalSizeReduction);
         const totalJobs = jobFileData.jobs.length;
-        await jobFileManager.shutdownAndFlush();
         appLogger.LogInfo("all jobs finished", { prettyDuration, durationMilliseconds, prettyTotalSizeReduction, totalSizeReduction, successfulJobs, failedJobs, totalJobs })
         appOutputWriter.writeLine(`All jobs completed`);
         appOutputWriter.writeLine(`Run time: ${prettyDuration}`);
@@ -231,12 +230,14 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appOutputWriter.writeLine(`Jobs Successful: ${successfulJobs}`);
         appOutputWriter.writeLine(`Jobs Failed: ${failedJobs}`);
         appOutputWriter.writeLine(`Total number of jobs: ${totalJobs}`);
-        appOutputWriter.writeLine(`The job file for this run is located at: ${appOptions.jobFile}`);
+        await jobFileManager.shutdownAndFlush();
 
     } catch (err: unknown) {
         appLogger.LogError("app encountered fatal error!", err as Error, {});
         appOutputWriter.writeLine("app encountered fatal error, please see the logs");
     } finally {
+        appLogger.LogInfo("The job file for this run was saved", { jobFile: appOptions.jobFile });
+        appOutputWriter.writeLine(`The job file for this run is located at: ${appOptions.jobFile}`);
         await appOutputWriter.shutdown();
         await appLogger.shutdown();
     }
