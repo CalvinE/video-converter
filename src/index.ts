@@ -19,6 +19,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
 
 /* 
     TODO: list
+    * clean up output writer and logger output.
     * make a function to create output folders, so the parent directory is all in one place...
     * Improve code here so there is not so much in one place to try and read...
     * handle signals to cancel the command properly like ???
