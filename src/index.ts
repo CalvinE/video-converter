@@ -1,6 +1,6 @@
 import { IJobFileManager, JobFileManager } from './JobFileManager';
 import { join, resolve } from 'path';
-import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJob, GetInfoJob, CopyJob, INVALID, JobsArray, getJobID } from './VideoConverter/models';
+import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJob, GetInfoJob, CopyJob, INVALID, JobsArray, getJobID, JobFile } from './VideoConverter/models';
 import { IOutputWriter } from './OutputWriter/models';
 import { ConsoleOutputWriter } from './OutputWriter/ConsoleOutputWriter';
 import { FileManager, FSItem, FileInfo } from './FileManager';
@@ -26,6 +26,8 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
     * write *better* help info...
     * add log file directory as parameter
     * fix potential issue in options parser where there may be only one arg before options...
+    * fix job file manager so that it can have a whole job file written to it post construction.
+    * add handler for circumstance where we skip files if nothing will be changed for instance video and audio and container are all copy.
 */
 
 (async function () {
@@ -37,6 +39,8 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
     await appOutputWriter.initialize()
     const fileManager = new FileManager(appLogger);
 
+    const jobFileFullPath = resolve(appOptions.jobFile);
+
     const ffmpegVideoConverter = new FFMPEGVideoConverter("ffmpeg", "ffprobe", appLogger, fileManager);
     try {
         if (appOptions.help === true) {
@@ -47,9 +51,6 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
 
         appLogger.LogDebug("checking to see if we have access to ffmpeg and ffprobe", {});
         const commandCheckResult = await ffmpegVideoConverter.checkCommands();
-        process.on("SIGINT", () => {
-            throw new Error("SIGINT received, terminating application...")
-        });
         if (!commandCheckResult.success) {
             appOutputWriter.writeLine("check for ffmpeg and ffprobe failed");
             appLogger.LogError("check for ffmpeg and ffprobe failed", new Error("ffmpeg or ffprobe are not installed?"), { commandCheckResult });
@@ -60,17 +61,17 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appOutputWriter.writeLine("ffmpeg and ffprobe found on system");
 
         let jobFileManager: IJobFileManager;
-        if (fileManager.exists(appOptions.jobFile)) {
+        if (fileManager.exists(jobFileFullPath)) {
             // we are reading from a job file, so no need to parse other args and create jobs,
-            appLogger.LogInfo("reading job data from file", { targetJobFile: appOptions.jobFile });
-            appOutputWriter.write(`reading job data from ${appOptions.jobFile}`);
-            // const jobFileData = fileManager.readFile(appOptions.jobFile);
-            // jobs = JSON.parse(jobFileData);
-            jobFileManager = new JobFileManager(appLogger, fileManager, appOptions.jobFile, WRITE_PRETTY_JOB_FILE);
+            appLogger.LogInfo("reading job data from file", { targetJobFile: jobFileFullPath });
+            appOutputWriter.writeLine(`reading job data from ${jobFileFullPath}`);
+            const jobFileData = fileManager.readFile(jobFileFullPath);
+            const initialJobsFileData: JobFile = JSON.parse(jobFileData);
+            jobFileManager = new JobFileManager(appLogger, fileManager, jobFileFullPath, WRITE_PRETTY_JOB_FILE, initialJobsFileData);
         } else {
             // we need to make the jobs based on appOptions
-            appLogger.LogInfo("writing new job file because job file value does not exist in fs", { jobFile: appOptions.jobFile });
-            appOutputWriter.writeLine(`writing job file to ${appOptions.jobFile}`)
+            appLogger.LogInfo("writing new job file because job file value does not exist in fs", { jobFile: jobFileFullPath });
+            appOutputWriter.writeLine(`writing job file to ${jobFileFullPath}`)
             let subCommand: SubCommand = INVALID;
             if (appOptions.convertVideo === true) {
                 appLogger.LogDebug("convert flag found", {});
@@ -83,7 +84,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             appOutputWriter.writeLine(`enumerating directory: ${appOptions.sourcePath}`);
             const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
             const jobs = getAllJobs(appLogger, subCommand, sourcePathContents, appOptions);
-            jobFileManager = new JobFileManager(appLogger, fileManager, appOptions.jobFile, WRITE_PRETTY_JOB_FILE, {
+            jobFileManager = new JobFileManager(appLogger, fileManager, jobFileFullPath, WRITE_PRETTY_JOB_FILE, {
                 jobID: getJobID(),
                 durationMilliseconds: 0,
                 numCompletedJobs: 0,
@@ -97,10 +98,15 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             });
             if (appOptions.saveJobFileOnly === true) {
                 appLogger.LogInfo("exiting because saveJobFile flag is present.", { savedJobFileOnly: appOptions.saveJobFileOnly });
-                appOutputWriter.write(`saving job file (${jobs.length} jobs) jobs to ${appOptions.jobFile}`);
+                appOutputWriter.writeLine(`saving job file (${jobs.length} jobs) jobs to ${jobFileFullPath}`);
                 return;
             }
         }
+        // handle Ctrl+C make sure to flush job file.
+        process.on("SIGINT", async () => {
+            await jobFileManager.shutdownAndFlush();
+            throw new Error("SIGINT received, terminating application...")
+        });
         appLogger.LogVerbose("processing jobs due to lack of saveJobFileOnly flag", { savedJobFileOnly: appOptions.saveJobFileOnly })
         const jobFileData = jobFileManager.readJobFileData();
         appLogger.LogVerbose("about to restore app options from job file", { oldAppOptions: appOptions });
@@ -235,8 +241,8 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appLogger.LogError("app encountered fatal error!", err as Error, {});
         appOutputWriter.writeLine("app encountered fatal error, please see the logs");
     } finally {
-        appLogger.LogInfo("The job file for this run was saved", { jobFile: appOptions.jobFile });
-        appOutputWriter.writeLine(`The job file for this run is located at: ${appOptions.jobFile}`);
+        appLogger.LogInfo("The job file for this run was saved", { jobFile: jobFileFullPath });
+        appOutputWriter.writeLine(`The job file for this run is located at: ${jobFileFullPath}`);
         await appOutputWriter.shutdown();
         await appLogger.shutdown();
     }
@@ -360,7 +366,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         throw error;
     }
 
-    function getAllJobs(logger: ILogger, subCommand: SubCommand, items: FSItem[], options: AppOptions,): JobsArray {
+    function getAllJobs(logger: ILogger, subCommand: SubCommand, items: FSItem[], options: AppOptions): JobsArray {
         logger.LogDebug("getting all files based on parameters", { targetFileNameRegex: options.targetFileNameRegex?.source, allowedFileExtensions: options.allowedFileExtensions })
         const allowCopy = !options.saveInPlace;
         const jobs: JobsArray = [];

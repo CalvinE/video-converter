@@ -54,6 +54,8 @@ export class JobFileManager implements IJobFileManager {
                 throw new ErrorJobFilePathIsNotAFile(this._jobFileFullPath);
             }
             this._logger.LogInfo("resuming job from file provided", { jobFilePath });
+            // set is dirty to force initial read.
+            this._isDirty = true;
             this._jobFileData = this.readJobFileData();
             this._logger.LogVerbose("initial job data read", { initialJobData: this._jobFileData });
         } else if (initialJobFileData !== undefined) {
@@ -63,6 +65,7 @@ export class JobFileManager implements IJobFileManager {
             this._logger.LogVerbose("initial job data", { initialJobFileData });
             this._fileManager.makeDir(dirname(this._jobFileFullPath));
             this._jobFileData = initialJobFileData;
+            // set has uncommitted writes to force initial write
             this._hasUncommittedWrites = true;
             this.writeJobFileData();
         } else {
