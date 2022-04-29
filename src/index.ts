@@ -146,8 +146,9 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             let sourceFile = "";
             let targetFile = "";
             try {
+                job.state = "running";
+                jobFileManager.updateJob(job);
                 if (job.task === "convert") {
-                    job.state = "running";
                     const result = await processVideoConvertCommand(appLogger, appOutputWriter, job);
                     durationMilliseconds = result.duration;
                     totalSizeReduction += result.sizeDifference;
@@ -158,7 +159,6 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                     job.result = result;
                     success = result.success;
                 } else if (job.task === "getinfo") {
-                    job.state = "running";
                     const result = await processGetInfo(appLogger, appOutputWriter, job);
                     durationMilliseconds = result.duration;
                     sourceFile = result.sourceFileFullPath;
@@ -166,7 +166,6 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                     job.result = result;
                     success = result.success
                 } else if (job.task === "copy") {
-                    job.state = "running";
                     sourceFile = job.fileInfo.fullPath;
                     const targetFile = job.targetFileFullPath;
                     appOutputWriter.writeLine(`copying file: ${sourceFile} => ${targetFile}`);
