@@ -231,6 +231,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appOutputWriter.writeLine(`Jobs Successful: ${successfulJobs}`);
         appOutputWriter.writeLine(`Jobs Failed: ${failedJobs}`);
         appOutputWriter.writeLine(`Total number of jobs: ${totalJobs}`);
+        appOutputWriter.writeLine(`The job file for this run is located at: ${appOptions.jobFile}`);
 
     } catch (err: unknown) {
         appLogger.LogError("app encountered fatal error!", err as Error, {});
