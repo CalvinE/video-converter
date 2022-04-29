@@ -99,12 +99,18 @@ export class JobFileManager implements IJobFileManager {
                 this._jobFileData.prettyDuration = millisecondsToHHMMSS(this._jobFileData.durationMilliseconds);
             } // FIXME: handle copy jobs to add their duration too...
         }
-        if (job.state === "completed") {
-            // FIXME: this seems inefficient... find a better way t do this and account for jobs being restarted
-            this._jobFileData.numCompletedJobs = this._jobFileData.jobs.reduce((prev, job) => prev + job.state === "completed" ? 1 : 0, 0);
-        } else if (job.state === "error") {
-            // FIXME: this seems inefficient... find a better way t do this and account for jobs being restarted
-            this._jobFileData.numFailedJobs = this._jobFileData.jobs.reduce((prev, job) => prev + job.state === "error" ? 1 : 0, 0);
+        if (job.state == 'completed' || job.state == 'error') {
+            let completedCount = 0;
+            let failedCount = 0;
+            for (const j of this._jobFileData.jobs) {
+                if (j.state === "completed") {
+                    completedCount++;
+                } else if (j.state === "error") {
+                    failedCount++;
+                }
+            }
+            this._jobFileData.numCompletedJobs = completedCount;
+            this._jobFileData.numFailedJobs = failedCount;
         }
     }
 
@@ -113,12 +119,11 @@ export class JobFileManager implements IJobFileManager {
         const jobIndex = this._jobFileData.jobs.findIndex((j) => j.commandID === job.commandID);
         if (jobIndex >= 0) {
             this._logger.LogVerbose("updating job", { job, jobIndex })
+            this._jobFileData.jobs[jobIndex] = job;
             this.updateJobFileStatistics(job);
-            this._isDirty = true;
             this._hasUncommittedWrites = true
             this._logger.LogDebug("job index found for update", { jobIndex })
             this._logger.LogDebug("setting read and write cache to dirty", { hasUncommittedWrites: this._hasUncommittedWrites, isDirty: this._isDirty })
-            this._jobFileData.jobs[jobIndex] = job;
         } else {
             this._logger.LogWarn("received update for job not in the job file data", { job, jobFileFullPath: this._jobFileFullPath });
         }
@@ -128,6 +133,7 @@ export class JobFileManager implements IJobFileManager {
         if (this._hasUncommittedWrites === true) {
             this._logger.LogDebug("writing job file data from file", { jobFileFullPath: this._jobFileFullPath, hasUncommittedWrites: this._hasUncommittedWrites })
             this._fileManager.writeFile(this._jobFileFullPath, JSON.stringify(this._jobFileData, undefined, this._pretty ? 2 : 0), true);
+            // this._isDirty = true;
             this._hasUncommittedWrites = false;
             this._logger.LogDebug("clearing dirty flag for write cache", { hasUncommittedWrites: this._hasUncommittedWrites })
         } else {
