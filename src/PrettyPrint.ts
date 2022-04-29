@@ -15,6 +15,22 @@ export function dateToFileSafeDate(date: Date): string {
     return dateString;
 }
 
+export function HHMMSSmmToMilliseconds(HHMMSSmmString: string): number {
+    let milliseconds = 0;
+    const parts = HHMMSSmmString.split(":");
+    const hoursNumber = parseInt(parts[0], 10);
+    milliseconds += hoursNumber * 60 * 60 * 1000;
+    const minutesNumber = parseInt(parts[1], 10);
+    milliseconds += minutesNumber * 60 * 1000;
+    const secondsNumber = parseFloat(parts[2]);
+    milliseconds += secondsNumber * 1000;
+    return Math.floor(milliseconds)
+}
+
+export function HHMMSSmmToSeconds(HHMMSSmmString: string): number {
+    return HHMMSSmmToMilliseconds(HHMMSSmmString) / 1000;
+}
+
 export function millisecondsToHHMMSS(ms: number): string {
     const hours = Math.floor(ms / 1000 / 60 / 60);
     const minutes = Math.floor((ms / 1000 / 60 / 60 - hours) * 60);

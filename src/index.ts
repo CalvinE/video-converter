@@ -7,12 +7,12 @@ import { FileManager, FSItem, FileInfo } from './FileManager';
 import { FileLogger, ILogger } from './Logger';
 import { FFMPEGVideoConverter } from './VideoConverter';
 import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
-import { bytesToHumanReadableBytes, millisecondsToHHMMSS } from './PrettyPrint';
+import { bytesToHumanReadableBytes, HHMMSSmmToSeconds, millisecondsToHHMMSS } from './PrettyPrint';
 
 const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
 const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
-const FFMPEG_CURRENT_FRAME_REGEX = /frame=\s*(?<framenumber>\d+)/;
-const FFMPEG_CURRENT_TIME_REGEX = /time=\s*(?<duration>\d+\.?\d*)/;
+const FFMPEG_CURRENT_FRAME_REGEX = /frame=\s*(?<framenumber>\d+)/i;
+const FFMPEG_CURRENT_TIME_REGEX = /time=\s*(?<duration>\d{2,}:\d{2}:\d{2}\.?\d*)/i;
 const WRITE_PRETTY_JOB_FILE = true;
 
 const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
@@ -409,9 +409,22 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
     }
 
     function parseTotalDuration(videoInfo?: VideoGetInfoResult): number {
-        const totalDuration = videoInfo?.videoInfo?.format?.duration;
-        const totalDurationNumber = parseInt(totalDuration ?? "-1", 10);
-        return totalDurationNumber;
+        const videoStream: VideoStreamInfo | undefined = (videoInfo?.videoInfo?.streams?.find(s => s?.codec_type === "video") as VideoStreamInfo);
+        const videoStreamDurationString = videoStream?.duration;
+        if (videoStreamDurationString !== undefined) {
+            const videoContainerDurationNumber = parseFloat(videoStreamDurationString);
+            if (!isNaN(videoContainerDurationNumber)) {
+                return videoContainerDurationNumber;
+            }
+        }
+        const totalContainerDurationString = videoInfo?.videoInfo?.format?.duration;
+        if (totalContainerDurationString !== undefined) {
+            const totalDurationNumber = parseFloat(totalContainerDurationString);
+            if (isNaN(totalDurationNumber)) {
+                return totalDurationNumber;
+            }
+        }
+        return -1;
     }
 
     function noopProgressiveUpdate(): (args: CommandStdErrMessageReceivedEventData) => void {
@@ -440,9 +453,15 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             if (args.commandId === commandID) {
                 const regexMatch = args.commandMessage.match(FFMPEG_CURRENT_FRAME_REGEX);
                 const currentFrameString = regexMatch?.groups?.framenumber;
+                if (!currentFrameString) {
+                    logger.LogVerbose("could not find current frame in received message", { message: args.commandMessage });
+                    return;
+                }
                 logger.LogVerbose("current frame found", { commandID, currentFrame: currentFrameString, numberOfFrames: totalNumberOfFrames })
                 if (currentFrameString) {
-                    const progressiveUpdate = makeProgressiveUpdateLine(logger, commandID, currentFrameString, totalNumberOfFrames);
+                    const currentFrameNumber = parseInt(currentFrameString, 10);
+                    logger.LogVerbose("current duration parsed", { currentFrameString, currentFrameNumber });
+                    const progressiveUpdate = makeProgressiveUpdateLine(logger, commandID, currentFrameNumber, totalNumberOfFrames);
                     outputWriter.write(`${progressiveUpdate}\r`);
                 }
             }
@@ -454,20 +473,26 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             if (args.commandId === commandID) {
                 const regexMatch = args.commandMessage.match(FFMPEG_CURRENT_TIME_REGEX);
                 const currentDurationString = regexMatch?.groups?.duration;
-                logger.LogVerbose("current duration found", { commandID, currentFrame: currentDurationString, numberOfFrames: totalDuration })
+                if (!currentDurationString) {
+                    logger.LogVerbose("could not find current duration in received message", { message: args.commandMessage });
+                    return;
+                }
+                logger.LogVerbose("current duration found", { commandID, currentDurationString, totalDuration })
                 if (currentDurationString) {
-                    const progressiveUpdate = makeProgressiveUpdateLine(logger, commandID, currentDurationString, totalDuration);
+                    const currentDurationSeconds = HHMMSSmmToSeconds(currentDurationString);
+                    logger.LogVerbose("current duration parsed", { currentDurationString, currentDurationSeconds });
+                    const progressiveUpdate = makeProgressiveUpdateLine(logger, commandID, currentDurationSeconds, totalDuration);
                     outputWriter.write(`${progressiveUpdate}\r`);
                 }
             }
         }
     }
 
-    function makeProgressiveUpdateLine(logger: ILogger, commandID: string, currentValueString: string, totalValue: number): string {
-        const currentValueNumber = parseInt(currentValueString, 10);
+    function makeProgressiveUpdateLine(logger: ILogger, commandID: string, currentValueNumber: number, totalValue: number): string {
+
         const pctDone = Math.floor(currentValueNumber / totalValue * 100);
         const numMarkers = Math.floor(pctDone / 5);
-        logger.LogVerbose("percent done calculated", { commandID, totalValue, currentValueString, currentValueNumber, pctDone, numMarkers });
+        logger.LogVerbose("percent done calculated", { commandID, totalValue, currentValueNumber, pctDone, numMarkers });
         const arrow = `${"=".repeat(numMarkers ?? 0)}>`.padEnd(20, " ")
         const progressiveUpdate = `|${arrow}| %${pctDone}`.padEnd(PROGRESSIVE_UPDATE_CHAR_WIDTH, " ");
         return progressiveUpdate;
@@ -482,7 +507,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             makeProgressiveUpdateFunction = noopProgressiveUpdate();
         } else if (totalDuration !== undefined) {
             if (totalDuration <= 0) {
-                logger.LogWarn("duration based progressive updates are broken because we have an invalid number of frames. resorting to naive updates.", { numberOfFrames, totalDuration, commandID });
+                logger.LogWarn("duration based progressive updates are broken because we have an invalid duration. resorting to naive updates.", { numberOfFrames, totalDuration, commandID });
                 makeProgressiveUpdateFunction = naiveProgressiveUpdate(logger, outputWriter, commandID);
             } else {
                 logger.LogDebug("video duration is available. setting progressive updates to duration based updates.", { numberOfFrames, totalDuration, commandID });
@@ -490,7 +515,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             }
         } else if (numberOfFrames !== undefined) {
             if (numberOfFrames <= 0) {
-                logger.LogWarn("frame base progressive updates are broken because we have an invalid number of frames. resorting to naive updates.", { numberOfFrames, totalDuration, commandID });
+                logger.LogWarn("frame based progressive updates are broken because we have an invalid number of frames. resorting to naive updates.", { numberOfFrames, totalDuration, commandID });
                 makeProgressiveUpdateFunction = naiveProgressiveUpdate(logger, outputWriter, commandID);
             } else {
                 logger.LogDebug("video total frame count is available. setting progressive updates to current frame based updates.", { numberOfFrames, totalDuration, commandID });
@@ -514,6 +539,10 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             logger.LogWarn("failed to get video info", { videoInfoResult })
         }
         appOutputWriter.writeLine(`converting file: ${job.fileInfo.fullPath}`);
+        if (fileManager.exists(job.options.targetFileFullPath)) {
+            // TODO: add an allow clobber flag that will remove files if they are present? or do not and let the logic above for resuming aborted and errored jobs handle it?
+            throw new Error("file already exists. Dont want to clobber it.")
+        }
         const convertPromise = ffmpegVideoConverter.convertVideo(job.fileInfo, job.options);
         const numberOfFrames = parseNumberOfFrames(videoInfoResult ?? {});
         const totalDuration = parseTotalDuration(videoInfoResult ?? {});
