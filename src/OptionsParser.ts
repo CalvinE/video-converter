@@ -23,6 +23,7 @@ const GET_INFO_OPTION_NAME = "getInfo";
 const CONVERT_VIDEO_OPTION_NAME = "convertVideo";
 const SAVE_JOB_FILE_ONLY_OPTION_NAME = "saveJobFileOnly";
 const JOB_FILE_PATH_OPTION_NAME = "jobFile";
+const CONCURRENT_JOBS_OPTION_NAME = "concurrentJobs";
 const X_ARGS_OPTION_NAME = "xArgs"
 const HELP_OPTION_NAME = "help";
 
@@ -43,6 +44,7 @@ export type AppOptions = {
     [CONVERT_VIDEO_OPTION_NAME]: boolean;
     [SAVE_JOB_FILE_ONLY_OPTION_NAME]: boolean;
     [JOB_FILE_PATH_OPTION_NAME]: string;
+    [CONCURRENT_JOBS_OPTION_NAME]: number;
     [X_ARGS_OPTION_NAME]: string[];
     [HELP_OPTION_NAME]: boolean;
 }
@@ -73,6 +75,7 @@ export function ParseOptions(): AppOptions {
         convertVideo: false,
         saveJobFileOnly: false,
         jobFile: join(".", "output", "jobs", `${dateToFileSafeDate(new Date())}-video-converter-job.json`),
+        concurrentJobs: 1,
         xArgs: [],
         help: false,
     };
@@ -175,6 +178,16 @@ export function ParseOptions(): AppOptions {
             case JOB_FILE_PATH_OPTION_NAME:
                 options[JOB_FILE_PATH_OPTION_NAME] = argv[++i];
                 break;
+            case CONCURRENT_JOBS_OPTION_NAME:
+                // eslint-disable-next-line no-case-declarations
+                const concurrentJobsString = argv[++i];
+                // eslint-disable-next-line no-case-declarations
+                const concurrentJobsNumber = parseInt(concurrentJobsString, 10);
+                if (isNaN(concurrentJobsNumber) || concurrentJobsNumber <= 0) {
+                    throw new Error(`${CONCURRENT_JOBS_OPTION_NAME} options was not a valid positive number greater than zero: ${concurrentJobsString}`);
+                }
+                options[CONCURRENT_JOBS_OPTION_NAME] = concurrentJobsNumber;
+                break;
             default:
                 // If we get here we did something wrong... print help and return?
                 // FIXME: abstract how this is output?
@@ -258,6 +271,10 @@ export function PrintHelp() {
             {
                 name: JOB_FILE_PATH_OPTION_NAME,
                 description: `A path to a json job file. if none is provided a default will be generated. If the file provided does not exist it will be created and populated based on the other options provided.`,
+            },
+            {
+                name: CONCURRENT_JOBS_OPTION_NAME,
+                description: "(NOT IMPLEMENTED YET) A number representing how may jobs the should be processed at one time. Defaults to 1.",
             },
             {
                 name: X_ARGS_OPTION_NAME,
