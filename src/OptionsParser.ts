@@ -217,7 +217,7 @@ export function PrintHelp() {
             },
             {
                 name: TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME,
-                description: "The video container format that the transcoded video will be saved in. If not provided the video container format will not be changed.",
+                description: "The video container format (with or without the preceding .) that the transcoded video will be saved in. If not provided the video container format will not be changed.",
             },
             {
                 name: TARGET_AUDIO_ENCODER_PATH_OPTION_NAME,

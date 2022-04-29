@@ -60,7 +60,7 @@ export const VideoContainerFormat_MP4 = "mp4";
 export const VideoContainerFormat_MOV = "mov";
 export const VideoContainerFormat_AVI = "avi";
 
-export type VideoContainerFormat = `${typeof VideoContainerFormat_MP4 | typeof VideoContainerFormat_MOV | typeof VideoContainerFormat_AVI | typeof COPY | typeof INVALID}`;
+export type VideoContainerFormat = string | `${typeof COPY}`;
 
 // FIXME: Having this hard coded is an issue, we should pull encoders from the `ffmpeg -codecs` command?
 export const LibX265VideoEncoder = "libx265";

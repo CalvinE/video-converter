@@ -20,6 +20,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
 /* 
     TODO: list
     * clean up output writer and logger output.
+    * add support for multiple jobs simultaneously?
     * make a function to create output folders, so the parent directory is all in one place...
     * Improve code here so there is not so much in one place to try and read...
     * handle signals to cancel the command properly like ???
@@ -42,7 +43,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
 
     const jobFileFullPath = resolve(appOptions.jobFile);
 
-    const ffmpegVideoConverter = new FFMPEGVideoConverter("ffmpeg", "ffprobe", appLogger, fileManager);
+    const ffmpegVideoConverter = new FFMPEGVideoConverter(appLogger, fileManager, "ffmpeg", "ffprobe");
     try {
         if (appOptions.help === true) {
             // print help and return...
@@ -91,11 +92,11 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                 numCompletedJobs: 0,
                 numFailedJobs: 0,
                 numJobs: jobs.length,
-                jobs,
-                options: appOptions,
                 prettyDuration: millisecondsToHHMMSS(0),
                 prettyTotalReduction: bytesToHumanReadableBytes(0),
                 totalSizeReductionBytes: 0,
+                jobs,
+                options: appOptions,
             });
             if (appOptions.saveJobFileOnly === true) {
                 appLogger.LogInfo("exiting because saveJobFile flag is present.", { savedJobFileOnly: appOptions.saveJobFileOnly });
@@ -123,6 +124,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         let failedJobs = 0; let i = 0;
         for (const job of jobFileData.jobs) {
             i++;
+            appOutputWriter.writeLine("");
             if (job.state === "running" || job.state === "error") {
                 // a job was started, so we need to clean up the what files may have been created
                 appLogger.LogInfo(`attempting to restart job`, { job });
@@ -221,16 +223,18 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             } finally {
                 jobFileManager.updateJob(job);
             }
+
+            appOutputWriter.writeLine("");
         }
         // add a line to make it easier to read.
-        appOutputWriter.writeLine("");
         const endTimeMilliseconds = Date.now();
         const durationMilliseconds = endTimeMilliseconds - startTimeMilliseconds;
         const prettyDuration = millisecondsToHHMMSS(durationMilliseconds);
         const prettyTotalSizeReduction = bytesToHumanReadableBytes(totalSizeReduction);
         const totalJobs = jobFileData.jobs.length;
+        appOutputWriter.writeLine("");
         appLogger.LogInfo("all jobs finished", { prettyDuration, durationMilliseconds, prettyTotalSizeReduction, totalSizeReduction, successfulJobs, failedJobs, totalJobs })
-        appOutputWriter.writeLine(`All jobs completed`);
+        appOutputWriter.writeLine(`All jobs finished`);
         appOutputWriter.writeLine(`Run time: ${prettyDuration}`);
         appOutputWriter.writeLine(`Total Size Reduction: ${prettyTotalSizeReduction}`);
         appOutputWriter.writeLine(`Jobs Successful: ${successfulJobs}`);
@@ -266,17 +270,22 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             logger.LogDebug("using options save path for target file path", { absoluteParentPath });
         }
 
-        let targetFileFullPath: string;
+        let targetFileName: string;
         if (options.targetContainerFormat === "copy") {
-            targetFileFullPath = sourceFile.name;
+            targetFileName = sourceFile.name;
             logger.LogDebug("option target container format is set to copy, so we are not changing the extension", {});
         } else {
-            targetFileFullPath = `${sourceFile.name.substring(sourceFile.name.lastIndexOf("."))}.${options.targetContainerFormat}`;
-            logger.LogDebug("using option target container format on file name", { targetFileName: targetFileFullPath, targetContainerFormat: options.targetContainerFormat });
+            let targetContainerFormat = options.targetContainerFormat;
+            if (targetContainerFormat.startsWith(".")) {
+                targetContainerFormat = targetContainerFormat.substring(1);
+            }
+            // FIXME: validate the target file container extension?
+            targetFileName = `${sourceFile.name.substring(0, sourceFile.name.lastIndexOf("."))}.${targetContainerFormat}`;
+            logger.LogDebug("using option target container format on file name", { targetFileName: targetFileName, targetContainerFormat: options.targetContainerFormat });
         }
 
-        targetFileFullPath = join(absoluteParentPath, targetFileFullPath);
-        logger.LogDebug("target file location built", { sourceFile, absoluteParentPath, targetFileFullPath, });
+        const targetFileFullPath = join(absoluteParentPath, targetFileName);
+        logger.LogDebug("target file location built", { sourceFile, absoluteParentPath, targetFileFullPath: targetFileName, });
         return {
             absoluteParentPath,
             targetFileFullPath,
@@ -497,7 +506,6 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
     }
 
     function makeProgressiveUpdateLine(logger: ILogger, commandID: string, currentValueNumber: number, totalValue: number): string {
-
         const pctDone = Math.floor(currentValueNumber / totalValue * 100);
         const numMarkers = Math.floor(pctDone / 5);
         logger.LogVerbose("percent done calculated", { commandID, totalValue, currentValueNumber, pctDone, numMarkers });
@@ -547,6 +555,10 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             logger.LogWarn("failed to get video info", { videoInfoResult })
         }
         appOutputWriter.writeLine(`converting file: ${job.fileInfo.fullPath}`);
+        appOutputWriter.writeLine(`video encoder => ${appOptions.targetVideoEncoder}`);
+        appOutputWriter.writeLine(`audio encoder => ${appOptions.targetAudioEncoder}`);
+        appOutputWriter.writeLine(`container format => ${appOptions.targetContainerFormat}`);
+        appOutputWriter.writeLine(`target file => ${job.options.targetFileFullPath}`);
         if (fileManager.exists(job.options.targetFileFullPath)) {
             // TODO: add an allow clobber flag that will remove files if they are present? or do not and let the logic above for resuming aborted and errored jobs handle it?
             throw new Error("file already exists. Dont want to clobber it.")

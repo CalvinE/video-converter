@@ -29,7 +29,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
     private _ffprobeCommand: string
     private _fileManager: IFileManager;
 
-    constructor(ffmpegCommand: string, ffprobeCommand: string, logger: ILogger, fileManager: IFileManager) {
+    constructor(logger: ILogger, fileManager: IFileManager, ffmpegCommand: string, ffprobeCommand: string) {
         super(logger);
         this._logger = logger;
         this._fileManager = fileManager;
@@ -37,7 +37,6 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this._ffprobeCommand = ffprobeCommand ?? "ffprobe";
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public override async checkCommands(): Promise<CommandCheckResult> {
         this._logger.LogVerbose("checking to see if command can be run.", { command: this._ffmpegCommand });
         const checkCommandsCommandID = "checkCommands";
