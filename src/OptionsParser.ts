@@ -24,6 +24,7 @@ const CONVERT_VIDEO_OPTION_NAME = "convertVideo";
 const SAVE_JOB_FILE_ONLY_OPTION_NAME = "saveJobFileOnly";
 const JOB_FILE_PATH_OPTION_NAME = "jobFile";
 const CONCURRENT_JOBS_OPTION_NAME = "concurrentJobs";
+const SWEET_DISPLAY_OPTION_NAME = "sweetDisplay";
 const X_ARGS_OPTION_NAME = "xArgs"
 const HELP_OPTION_NAME = "help";
 
@@ -45,6 +46,7 @@ export type AppOptions = {
     [SAVE_JOB_FILE_ONLY_OPTION_NAME]: boolean;
     [JOB_FILE_PATH_OPTION_NAME]: string;
     [CONCURRENT_JOBS_OPTION_NAME]: number;
+    [SWEET_DISPLAY_OPTION_NAME]: boolean;
     [X_ARGS_OPTION_NAME]: string[];
     [HELP_OPTION_NAME]: boolean;
 }
@@ -76,12 +78,16 @@ export function ParseOptions(): AppOptions {
         saveJobFileOnly: false,
         jobFile: join(".", "output", "jobs", `${dateToFileSafeDate(new Date())}-video-converter-job.json`),
         concurrentJobs: 1,
+        sweetDisplay: false,
         xArgs: [],
         help: false,
     };
-    // FIXME: this may need to be change so that it does not hard code the 2. If this app is npm installed I think that will be wrong.
-    for (let i = 2; i < argv.length; i++) {
+    for (let i = 0; i < argv.length; i++) {
         const currentArg = argv[i].substring(2);
+        if (!currentArg?.startsWith("--")) {
+            // All parameters start with -- so it does not start with -- we ignore it?
+            continue;
+        }
         switch (currentArg) {
             case HELP_OPTION_NAME:
                 options[HELP_OPTION_NAME] = true;
@@ -188,6 +194,9 @@ export function ParseOptions(): AppOptions {
                 }
                 options[CONCURRENT_JOBS_OPTION_NAME] = concurrentJobsNumber;
                 break;
+            case SWEET_DISPLAY_OPTION_NAME:
+                options[SWEET_DISPLAY_OPTION_NAME] = true;
+                break;
             default:
                 // If we get here we did something wrong... print help and return?
                 // FIXME: abstract how this is output?
@@ -203,7 +212,6 @@ export function ParseOptions(): AppOptions {
 }
 
 export function PrintHelp() {
-    // TODO: Write this and make some data in here to keep track of the info for the help data...
     const helpData: {
         name: string,
         description: string,
@@ -272,10 +280,14 @@ export function PrintHelp() {
                 name: JOB_FILE_PATH_OPTION_NAME,
                 description: `A path to a json job file. if none is provided a default will be generated. If the file provided does not exist it will be created and populated based on the other options provided.`,
             },
-            {
-                name: CONCURRENT_JOBS_OPTION_NAME,
-                description: "(NOT IMPLEMENTED YET) A number representing how may jobs the should be processed at one time. Defaults to 1.",
-            },
+            // {
+            //     name: CONCURRENT_JOBS_OPTION_NAME,
+            //     description: "(NOT IMPLEMENTED YET) A number representing how may jobs the should be processed at one time. Defaults to 1.",
+            // },
+            // {
+            //     name: SWEET_DISPLAY_OPTION_NAME,
+            //     description: "(NOT IMPLEMENTED YET) A flag. When present the output from the application will be a sweet in place display in the console.",
+            // },
             {
                 name: X_ARGS_OPTION_NAME,
                 description: "Allows additional info to be passed in to FFMPEG or FFPROBE. Best to use once for each item to append to the command. Also supports a JSON array of strings.",
