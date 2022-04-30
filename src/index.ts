@@ -512,32 +512,21 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         return progressiveUpdate;
     }
 
-    function buildConvertOutputHandler(logger: ILogger, outputWriter: IOutputWriter, commandID: string, numberOfFrames?: number, totalDuration?: number): (args: CommandStdErrMessageReceivedEventData) => void {
+    function buildConvertOutputHandler(logger: ILogger, outputWriter: IOutputWriter, commandID: string, numberOfFrames: number, totalDuration: number): (args: CommandStdErrMessageReceivedEventData) => void {
         const doProgressiveUpdates = outputWriter.supportsProgressiveUpdates();
-        let makeProgressiveUpdateFunction: (args: CommandStdErrMessageReceivedEventData) => void;
+        let makeProgressiveUpdateFunction: (args: CommandStdErrMessageReceivedEventData) => void = naiveProgressiveUpdate(logger, outputWriter, commandID);
         if (!doProgressiveUpdates) {
             // default to noop updated
             logger.LogDebug("disabling progressive updated because the output writer does not support progressive updates.", { numberOfFrames, totalDuration, commandID });
             makeProgressiveUpdateFunction = noopProgressiveUpdate();
-        } else if (totalDuration !== undefined) {
-            if (totalDuration <= 0) {
-                logger.LogWarn("duration based progressive updates are broken because we have an invalid duration. resorting to naive updates.", { numberOfFrames, totalDuration, commandID });
-                makeProgressiveUpdateFunction = naiveProgressiveUpdate(logger, outputWriter, commandID);
-            } else {
-                logger.LogDebug("video duration is available. setting progressive updates to duration based updates.", { numberOfFrames, totalDuration, commandID });
-                makeProgressiveUpdateFunction = durationCountBasedProgressiveUpdate(logger, outputWriter, commandID, totalDuration);
-            }
-        } else if (numberOfFrames !== undefined) {
-            if (numberOfFrames <= 0) {
-                logger.LogWarn("frame based progressive updates are broken because we have an invalid number of frames. resorting to naive updates.", { numberOfFrames, totalDuration, commandID });
-                makeProgressiveUpdateFunction = naiveProgressiveUpdate(logger, outputWriter, commandID);
-            } else {
-                logger.LogDebug("video total frame count is available. setting progressive updates to current frame based updates.", { numberOfFrames, totalDuration, commandID });
-                makeProgressiveUpdateFunction = frameCountBasedProgressiveUpdate(logger, outputWriter, commandID, numberOfFrames);
-            }
+        } else if (totalDuration > -1) {
+            logger.LogDebug("video duration is available. setting progressive updates to duration based updates.", { numberOfFrames, totalDuration, commandID });
+            makeProgressiveUpdateFunction = durationCountBasedProgressiveUpdate(logger, outputWriter, commandID, totalDuration);
+        } else if (numberOfFrames > -1) {
+            logger.LogDebug("video total frame count is available. setting progressive updates to current frame based updates.", { numberOfFrames, totalDuration, commandID });
+            makeProgressiveUpdateFunction = frameCountBasedProgressiveUpdate(logger, outputWriter, commandID, numberOfFrames);
         } else {
             logger.LogDebug("no data available for progressive updates. resorting to naive updates", { numberOfFrames, totalDuration, commandID });
-            makeProgressiveUpdateFunction = naiveProgressiveUpdate(logger, outputWriter, commandID);
         }
         return makeProgressiveUpdateFunction;
     }
