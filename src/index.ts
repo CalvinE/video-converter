@@ -19,6 +19,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
 
 /* 
     TODO: list
+    * make a sweet CSI driven display for running jobs.
     * clean up output writer and logger output.
     * add support for multiple jobs simultaneously?
     * make a function to create output folders, so the parent directory is all in one place...
@@ -201,7 +202,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                 } else {
                     successfulJobs++;
                     appLogger.LogInfo("job successful", { job });
-                    appOutputWriter.writeLine(`job ${job.commandID} completed`);
+                    appOutputWriter.writeLine(`job ${job.commandID} finished`);
                     appOutputWriter.writeLine(`run time: ${millisecondsToHHMMSS(durationMilliseconds)}`);
                     if (sizeBytesReduction !== 0) {
                         appOutputWriter.writeLine(`file size reduced by ${bytesToHumanReadableBytes(sizeBytesReduction)}`);
@@ -213,8 +214,6 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                         }
                     }
                 }
-                // add a line to make it easier to read.
-                appOutputWriter.writeLine("");
             } catch (err) {
                 failedJobs++;
                 job.state = "error";
@@ -224,8 +223,6 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             } finally {
                 jobFileManager.updateJob(job);
             }
-
-            appOutputWriter.writeLine("");
         }
         // add a line to make it easier to read.
         const endTimeMilliseconds = Date.now();
