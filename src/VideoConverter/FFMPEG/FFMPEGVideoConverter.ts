@@ -97,6 +97,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
 
     public async getVideoInfo(sourceFile: FileInfo, options: GetVideoInfoOptions): Promise<VideoGetInfoResult> {
         const args = [
+            "-hide_banner",
             "-v",
             "quiet",
             "-print_format",
@@ -126,6 +127,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         const targetFilePath: string = dirname(options.targetFileFullPath)
         this._fileManager.makeDir(targetFilePath);
         let args: string[] = [
+            "-hide_banner",
             "-i",
             `"${sourceFile.fullPath}"`,
             "-c:v",
