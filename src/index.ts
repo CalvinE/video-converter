@@ -193,11 +193,12 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                     (job as any).state = "error";
                 }
                 if (success !== true) {
+                    job.state = "error";
                     failedJobs++;
                     appLogger.LogWarn("job failed", {
                         job
                     });
-                    appOutputWriter.writeLine(`job ${job.commandID} failed see logs for details`);
+                    appOutputWriter.writeLine(`job failed: ${job.commandID} see logs for details`);
                     appOutputWriter.writeLine(`run time: ${millisecondsToHHMMSS(durationMilliseconds)}`);
                 } else {
                     successfulJobs++;
