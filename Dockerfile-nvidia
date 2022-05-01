@@ -29,5 +29,10 @@ RUN npm install
 
 RUN npm run build
 
+
+ENTRYPOINT []
 # node .\build\index.js --targetFileNameRegex .*\.mp4 --convertVideo --sourcePath "F:\Bob's Burgers\Bob's Burgers Season 1" --targetVideoEncoder libx265 --copyRelativeFolderPath --savePath ".\oother-test"
-ENTRYPOINT [ "/root/.nvm/versions/node/v16.14.2/bin/node", "./build/index.js", "--convertVideo", "--sourcePath", "/source", "--targetVideoEncoder", "hevc_nvenc", "--copyRelativeFolderPath", "--savePath", "/result", "--useCuda", "--fileCopyExtensions", ".jpg,.srt" ]
+# CMD [ "/root/.nvm/versions/node/v16.14.2/bin/node", "./build/index.js", "--convertVideo", "--sourcePath", "/source", "--targetVideoEncoder", "hevc_nvenc", "--copyRelativeFolderPath", "--savePath", "/result", "--useCuda", "--xArgs", "-cq:v", "--xArgs", "19", "--xArgs", "-rc-lookahead:v", "--xArgs", "40", "--xArgs", "-rc:v", "--xArgs", "vbr", "--fileCopyExtensions", ".jpg,.srt" ]
+# CMD [ "/root/.nvm/versions/node/v16.14.2/bin/node", "./build/index.js", "--convertVideo", "--sourcePath", "/source", "--targetVideoEncoder", "hevc_nvenc", "--copyRelativeFolderPath", "--savePath", "/result", "--useCuda", "--fileCopyExtensions", ".jpg,.srt", "--xArgs", "-rc", "--xArgs", "vbr_hq", "--xArgs", "-preset", "--xArgs", "p6", "--xArgs", "-profile", "--xArgs", "main" ]
+CMD [ "/root/.nvm/versions/node/v16.14.2/bin/node", "./build/index.js", "--convertVideo", "--sourcePath", "/source", "--targetVideoEncoder", "hevc_nvenc", "--copyRelativeFolderPath", "--savePath", "/result", "--useCuda", "--fileCopyExtensions", ".jpg,.srt", "--xArgs", "-preset", "--xArgs", "p5", "--xArgs", "-profile", "--xArgs", "main", "--xArgs", "-b_ref_mode", "--xArgs", "2" ]
+# CMD [ "/root/.nvm/versions/node/v16.14.2/bin/node", "./build/index.js", "--convertVideo", "--sourcePath", "/source", "--targetVideoEncoder", "hevc_nvenc", "--copyRelativeFolderPath", "--savePath", "/result", "--useCuda", "--fileCopyExtensions", ".jpg,.srt" ]

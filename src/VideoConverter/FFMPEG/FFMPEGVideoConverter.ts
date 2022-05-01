@@ -136,7 +136,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             `"${options.targetFileFullPath}"`,
         ];
         if (options.useCuda === true) {
-            args = ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda", ...args];
+            args = ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-extra_hw_frames", "4", ...args];
         }
         const commandResult = await this.executeCommand(this._ffmpegCommand, args, options.commandID, options.timeoutMilliseconds);
         if (commandResult.success === true) {
