@@ -79,22 +79,26 @@ export function ParseOptions(): AppOptions {
         xArgs: [],
         help: false,
     };
-    // FIXME: this may need to be change so that it does not hard code the 2. If this app is npm installed I think that will be wrong.
     for (let i = 2; i < argv.length; i++) {
-        const currentArg = argv[i].substring(2);
-        switch (currentArg) {
+        const currentArg = argv[i];
+        if (!currentArg?.startsWith("--")) {
+            // All parameters start with -- so it does not start with -- we ignore it?
+            continue;
+        }
+        switch (currentArg.substring(2)) {
             case HELP_OPTION_NAME:
                 options[HELP_OPTION_NAME] = true;
                 break;
             case X_ARGS_OPTION_NAME:
                 // eslint-disable-next-line no-case-declarations
-                const xargs = JSON.parse(argv[++i]);
-                if (Array.isArray(xargs)) {
-                    const args = xargs.map((x) => safeQuoteXArg(x));
-                    options[X_ARGS_OPTION_NAME].push(...args);
-                } else {
-                    options[X_ARGS_OPTION_NAME].push(safeQuoteXArg(xargs as string));
-                }
+                const xargs = argv[++i];
+                // const xargs = JSON.parse(argv[++i]);
+                // if (Array.isArray(xargs)) {
+                //     const args = xargs.map((x) => safeQuoteXArg(x));
+                //     options[X_ARGS_OPTION_NAME].push(...args);
+                // } else {
+                options[X_ARGS_OPTION_NAME].push(safeQuoteXArg(xargs as string));
+                // }
                 break;
             case SOURCE_PATH_OPTION_NAME:
                 options[SOURCE_PATH_OPTION_NAME] = argv[++i];
