@@ -1,6 +1,6 @@
 import { IJobFileManager, JobFileManager } from './JobFileManager';
-import { join, resolve } from 'path';
-import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJob, GetInfoJob, CopyJob, INVALID, JobsArray, getJobID, JobFile } from './VideoConverter/models';
+import { basename, extname, join, resolve } from 'path';
+import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJob, GetInfoJob, CopyJob, INVALID, JobsArray, getJobID, JobFile, Job } from './VideoConverter/models';
 import { IOutputWriter } from './OutputWriter/models';
 import { ConsoleOutputWriter } from './OutputWriter/ConsoleOutputWriter';
 import { FileManager, FSItem, FileInfo } from './FileManager';
@@ -19,6 +19,8 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
 
 /* 
     TODO: list
+    * refactor jobs to classes with constructor that takes job state. Have abstract base class that implements common functions.
+    * allow a prefix / suffix to be added to converted files.
     * make a sweet CSI driven display for running jobs.
     * clean up output writer and logger output.
     * add support for multiple jobs simultaneously?
@@ -36,7 +38,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
 (async function () {
     let appOptions: AppOptions = ParseOptions();
     // const logger: ILogger = new PrettyJSONConsoleLogger("verbose");
-    const appLogger: ILogger = new FileLogger("verbose", join(".", "output", "logs"), true);
+    const appLogger: ILogger = new FileLogger("info", join(".", "output", "logs"), true);
     appLogger.LogDebug("application starting", { appOptions })
     const appOutputWriter: IOutputWriter = new ConsoleOutputWriter();
     await appOutputWriter.initialize()
@@ -87,18 +89,31 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
             appOutputWriter.writeLine(`enumerating directory: ${appOptions.sourcePath}`);
             const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
             const jobs = getAllJobs(appLogger, subCommand, sourcePathContents, appOptions);
+            const preRunSize = jobs.reduce((a, j) => j.fileInfo.size + a, 0);
+            const jobFileName = basename(jobFileFullPath);
+            const jobName = jobFileName.replace(extname(jobFileName), "");
             jobFileManager = new JobFileManager(appLogger, fileManager, jobFileFullPath, WRITE_PRETTY_JOB_FILE, {
+                // The order of these fields is important.
+                // The order here is the order they will appear in the file.
+                // So ordering these well will make it easier to read in a text editor.
                 jobID: getJobID(),
+                jobName: jobName,
+                percentDone: 0,
+                percentSizeChange: 0,
+                totalSizeChangeBytes: 0,
+                prettyTotalSizeChange: bytesToHumanReadableBytes(0),
                 durationMilliseconds: 0,
+                prettyDuration: millisecondsToHHMMSS(0),
+                totalSizeBeforeProcessing: preRunSize,
+                prettyTotalSizeBeforeProcessing: bytesToHumanReadableBytes(preRunSize),
+                totalSizeAfterProcessing: 0,
+                prettyTotalSizeAfterProcessing: bytesToHumanReadableBytes(0),
                 numCompletedJobs: 0,
                 numFailedJobs: 0,
                 failedJobIDs: [],
                 numJobs: jobs.length,
-                prettyDuration: millisecondsToHHMMSS(0),
-                prettyTotalReduction: bytesToHumanReadableBytes(0),
-                totalSizeReductionBytes: 0,
-                jobs,
                 options: appOptions,
+                jobs,
             });
             if (appOptions.saveJobFileOnly === true) {
                 appLogger.LogInfo("exiting because saveJobFile flag is present.", { savedJobFileOnly: appOptions.saveJobFileOnly });
@@ -126,18 +141,14 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         let failedJobs = 0; let i = 0;
         for (const job of jobFileData.jobs) {
             i++;
+            appLogger.LogInfo("starting job", { commandID: job.commandID });
             appOutputWriter.writeLine("");
+            appOutputWriter.writeLine(`starting job ${i} of ${numJobs} ${job.commandID} - ${job.task}`);
             if (job.state === "running" || job.state === "error") {
                 // a job was started, so we need to clean up the what files may have been created
-                appLogger.LogInfo(`attempting to restart job`, { job });
-                appOutputWriter.writeLine(`attempting to restart job: ${job.state} - ${job.task} - ${job.commandID}`);
-                if (job.task === "convert") {
-                    appOutputWriter.writeLine(`attempting to remove partially processed file: ${job.options.targetFileFullPath}`);
-                    fileManager.safeUnlinkFile(job.options.targetFileFullPath);
-                } else if (job.task === "copy") {
-                    appOutputWriter.writeLine(`attempting to remove partially processed file: ${job.targetFileFullPath}`);
-                    fileManager.safeUnlinkFile(job.targetFileFullPath);
-                }
+                appLogger.LogInfo(`job was interrupted or encountered an error attempting to restart job`, { job });
+                appOutputWriter.writeLine(`job was interrupted or encountered an error attempting to restart job`);
+                handleJobFailureCleanup(appLogger, appOutputWriter, job);
                 job.state = "pending";
                 jobFileManager.updateJob(job);
             } else if (job.state === "completed") {
@@ -148,8 +159,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                 continue;
             }
             // pending is the only other state?
-            appLogger.LogInfo("starting job", { commandID: job.commandID });
-            appOutputWriter.writeLine(`starting job ${i} of ${numJobs} ${job.commandID} - ${job.task}`)
+            appOutputWriter.writeLine(`running job`)
             appLogger.LogDebug("job options", { job });
             let success = false
             let durationMilliseconds = 0;
@@ -219,8 +229,11 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                 failedJobs++;
                 job.state = "error";
                 job.failureReason = `${err}`;
+                appLogger.LogError("job processing failed", err as Error, { job });
                 appOutputWriter.writeLine(`an error occurred while processing job ${job.commandID}`);
                 appOutputWriter.writeLine(`error: ${job.failureReason}`);
+                handleJobFailureCleanup(appLogger, appOutputWriter, job);
+
             } finally {
                 jobFileManager.updateJob(job);
             }
@@ -249,6 +262,28 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appOutputWriter.writeLine(`The job file for this run is located at: ${jobFileFullPath}`);
         await appOutputWriter.shutdown();
         await appLogger.shutdown();
+    }
+
+    function handleJobFailureCleanup(logger: ILogger, outputWriter: IOutputWriter, job: Job) {
+        let targetFileFullPath: string;
+        if (job.task === "convert") {
+            targetFileFullPath = job.options.targetFileFullPath;
+        } else if (job.task === "copy") {
+            targetFileFullPath = job.targetFileFullPath;
+        } else {
+            logger.LogVerbose("job type does not require cleanup.", { job })
+            return;
+        }
+        logger.LogDebug("attempting to clean up failed job data.", { job });
+        outputWriter.writeLine(`attempting to delete target file if it exists ${targetFileFullPath}`);
+        fileManager.safeUnlinkFile(targetFileFullPath);
+        if (fileManager.exists(targetFileFullPath)) {
+            logger.LogWarn("failed to clean up failed job data", { targetFileFullPath });
+            outputWriter.writeLine(`failed to clean up failed job data ${targetFileFullPath}`);
+        } else {
+            logger.LogInfo("successfully removed failed job file data", { targetFileFullPath });
+            outputWriter.writeLine(`successfully removed failed job file data`);
+        }
     }
 
     function getTargetFileFullPath(logger: ILogger, sourceFile: FileInfo, options: AppOptions): {

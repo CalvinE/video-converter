@@ -3,10 +3,10 @@ import { dirname, resolve } from 'path';
 import { IFileManager } from './FileManager';
 import { ILogger } from './Logger';
 import { bytesToHumanReadableBytes, millisecondsToHHMMSS } from './PrettyPrint';
-import { JobFile, CopyJob, ConvertJob, GetInfoJob } from './VideoConverter/models';
+import { JobFile, Job } from './VideoConverter/models';
 
 export interface IJobFileManager {
-    updateJob(job: CopyJob | ConvertJob | GetInfoJob): void;
+    updateJob(job: Job): void;
     writeJobFileData(): void;
     readJobFileData(): JobFile;
     shutdownAndFlush(): Promise<void>
@@ -86,38 +86,51 @@ export class JobFileManager implements IJobFileManager {
         return Promise.resolve();
     }
 
-    private updateJobFileStatistics(job: CopyJob | ConvertJob | GetInfoJob) {
+    private updateJobFileStatistics(job: Job) {
         this._logger.LogDebug("updating job file statistics", {});
         if (job.result != undefined) {
             if (job.task === "convert") {
-                this._jobFileData.totalSizeReductionBytes += job.result?.sizeDifference ?? 0;
-                this._jobFileData.prettyTotalReduction = bytesToHumanReadableBytes(this._jobFileData.totalSizeReductionBytes);
+                this._jobFileData.totalSizeChangeBytes += job.result?.sizeDifference ?? 0;
+                this._jobFileData.prettyTotalSizeChange = bytesToHumanReadableBytes(this._jobFileData.totalSizeChangeBytes);
                 this._jobFileData.durationMilliseconds += job.result?.duration ?? 0;
                 this._jobFileData.prettyDuration = millisecondsToHHMMSS(this._jobFileData.durationMilliseconds);
             } else if (job.task === "getinfo") {
                 this._jobFileData.durationMilliseconds += job.result?.duration ?? 0;
                 this._jobFileData.prettyDuration = millisecondsToHHMMSS(this._jobFileData.durationMilliseconds);
-            }
+            } // FIXME: copy does not have a duration... need to fix that
         }
         if (job.state == 'completed' || job.state == 'error') {
             const failedJobIds: string[] = [];
             let completedCount = 0;
             let failedCount = 0;
+            let sizeAfterProcessing = 0;
             for (const j of this._jobFileData.jobs) {
                 if (j.state === "completed") {
                     completedCount++;
+                    if (job.task === "convert") {
+                        sizeAfterProcessing += job.result?.convertedFileSize ?? job.fileInfo.size;
+                    } else {
+                        sizeAfterProcessing += job.fileInfo.size;
+                    }
                 } else if (j.state === "error") {
                     failedJobIds.push(j.commandID);
                     failedCount++;
+                    sizeAfterProcessing += job.fileInfo.size;
+                } else {
+                    sizeAfterProcessing += job.fileInfo.size;
                 }
             }
             this._jobFileData.failedJobIDs = failedJobIds;
             this._jobFileData.numCompletedJobs = completedCount;
             this._jobFileData.numFailedJobs = failedCount;
+            this._jobFileData.totalSizeAfterProcessing = sizeAfterProcessing;
+            this._jobFileData.prettyTotalSizeAfterProcessing = bytesToHumanReadableBytes(this._jobFileData.totalSizeAfterProcessing);
+            this._jobFileData.percentSizeChange = (1 - (this._jobFileData.totalSizeAfterProcessing / this._jobFileData.totalSizeBeforeProcessing)) * -1;
+            this._jobFileData.percentDone = (completedCount / this._jobFileData.numJobs);
         }
     }
 
-    public updateJob(job: CopyJob | ConvertJob | GetInfoJob): void {
+    public updateJob(job: Job): void {
         this._logger.LogInfo("updating job file data for job", { commandID: job.commandID });
         const jobIndex = this._jobFileData.jobs.findIndex((j) => j.commandID === job.commandID);
         if (jobIndex >= 0) {

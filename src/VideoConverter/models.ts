@@ -41,19 +41,28 @@ export type CopyJob = BaseJob & {
   result?: boolean;
 };
 
-export type JobsArray = Array<CopyJob | ConvertJob | GetInfoJob>;
+export type Job = CopyJob | ConvertJob | GetInfoJob;
+
+export type JobsArray = Array<Job>;
 
 export type JobFile = {
   jobID: string;
+  jobName: string;
   options: AppOptions;
   jobs: JobsArray;
   numJobs: number;
   numCompletedJobs: number;
   numFailedJobs: number;
-  totalSizeReductionBytes: number;
-  prettyTotalReduction: string;
+  totalSizeBeforeProcessing: number;
+  prettyTotalSizeBeforeProcessing: string;
+  totalSizeAfterProcessing: number;
+  prettyTotalSizeAfterProcessing: string;
+  percentSizeChange: number;
+  totalSizeChangeBytes: number;
+  prettyTotalSizeChange: string;
   durationMilliseconds: number;
   prettyDuration: string;
+  percentDone: number;
   failedJobIDs: string[];
 }
 
@@ -129,6 +138,8 @@ export type VideoGetInfoResult = BaseVideoConverterResult & {
 
 export type VideoConvertResult = BaseVideoConverterResult & {
   targetFileFullPath: string;
+  convertedFileSize: number;
+  prettyConvertedFileSize: string;
   sizeDifference: number;
   sizeDifferencePretty: string;
   sourceFileFullPath: string;

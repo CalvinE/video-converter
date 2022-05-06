@@ -153,6 +153,8 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                 targetFileFullPath: options.targetFileFullPath,
                 sizeDifference: sizeDiff,
                 sizeDifferencePretty: bytesToHumanReadableBytes(sizeDiff),
+                convertedFileSize: targetFileInfo.size,
+                prettyConvertedFileSize: bytesToHumanReadableBytes(targetFileInfo.size),
             }
         }
         return {
@@ -164,6 +166,8 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             targetFileFullPath: options.targetFileFullPath,
             sizeDifference: 0,
             sizeDifferencePretty: bytesToHumanReadableBytes(0),
+            convertedFileSize: 0,
+            prettyConvertedFileSize: bytesToHumanReadableBytes(0),
         }
     }
 }

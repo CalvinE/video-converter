@@ -61,7 +61,7 @@ export abstract class BaseStructuredLogger implements ILogger {
             ...data,
             error: {
                 message: err.message,
-                name: err.name,
+                name: err?.name || `${err}`,
                 stack: err.stack,
             },
         }
