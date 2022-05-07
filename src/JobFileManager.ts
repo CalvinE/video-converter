@@ -107,17 +107,17 @@ export class JobFileManager implements IJobFileManager {
             for (const j of this._jobFileData.jobs) {
                 if (j.state === "completed") {
                     completedCount++;
-                    if (job.task === "convert") {
-                        sizeAfterProcessing += job.result?.convertedFileSize ?? job.fileInfo.size;
+                    if (j.task === "convert") {
+                        sizeAfterProcessing += j.result?.convertedFileSize ?? j.fileInfo.size;
                     } else {
-                        sizeAfterProcessing += job.fileInfo.size;
+                        sizeAfterProcessing += j.fileInfo.size;
                     }
                 } else if (j.state === "error") {
                     failedJobIds.push(j.commandID);
                     failedCount++;
-                    sizeAfterProcessing += job.fileInfo.size;
+                    sizeAfterProcessing += j.fileInfo.size;
                 } else {
-                    sizeAfterProcessing += job.fileInfo.size;
+                    sizeAfterProcessing += j.fileInfo.size;
                 }
             }
             this._jobFileData.failedJobIDs = failedJobIds;
