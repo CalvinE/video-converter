@@ -125,8 +125,8 @@ export class JobFileManager implements IJobFileManager {
             this._jobFileData.numFailedJobs = failedCount;
             this._jobFileData.totalSizeAfterProcessing = sizeAfterProcessing;
             this._jobFileData.prettyTotalSizeAfterProcessing = bytesToHumanReadableBytes(this._jobFileData.totalSizeAfterProcessing);
-            this._jobFileData.percentSizeChange = (1 - (this._jobFileData.totalSizeAfterProcessing / this._jobFileData.totalSizeBeforeProcessing)) * -1;
-            this._jobFileData.percentDone = (completedCount / this._jobFileData.numJobs);
+            this._jobFileData.percentSizeChange = 1 - (this._jobFileData.totalSizeAfterProcessing / this._jobFileData.totalSizeBeforeProcessing);
+            this._jobFileData.percentDone = completedCount / this._jobFileData.numJobs;
         }
     }
 
