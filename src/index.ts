@@ -23,7 +23,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
     * allow a prefix / suffix to be added to converted files.
     * make a sweet CSI driven display for running jobs.
     * clean up output writer and logger output.
-    * add support for multiple jobs simultaneously?
+    * add support for multiple jobs simultaneously? Or have a job orchestrator that can push individual jobs to clients waiting for work?
     * make a function to create output folders, so the parent directory is all in one place...
     * Improve code here so there is not so much in one place to try and read...
     * handle signals to cancel the command properly like ???
