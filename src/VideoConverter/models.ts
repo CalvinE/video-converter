@@ -15,33 +15,34 @@ export type Task = SubCommand | `${typeof COPY}`;
 
 export type State = "pending" | "running" | "completed" | "error";
 
-export type BaseJob = {
+export type BaseJobOptions = {
   commandID: string;
   host: string;
   failureReason?: string;
   fileInfo: FileInfo;
   state: State;
+  task: string;
 }
 
-export type ConvertJob = BaseJob & {
+export type ConvertJobOptions = BaseJobOptions & {
   task: "convert";
   options: VideoConvertOptions;
   result?: VideoConvertResult;
 }
 
-export type GetInfoJob = BaseJob & {
+export type GetInfoJobOptions = BaseJobOptions & {
   task: "getinfo";
   options: GetVideoInfoOptions;
   result?: VideoGetInfoResult;
 }
 
-export type CopyJob = BaseJob & {
+export type CopyJobOptions = BaseJobOptions & {
   task: "copy";
   targetFileFullPath: string;
   result?: boolean;
 };
 
-export type Job = CopyJob | ConvertJob | GetInfoJob;
+export type Job = CopyJobOptions | ConvertJobOptions | GetInfoJobOptions;
 
 export type JobsArray = Array<Job>;
 
@@ -115,14 +116,14 @@ export type VideoConvertOptions = BaseVideoConverterOptions & {
   targetAudioEncoding: AudioEncoder;
 };
 
-type BaseVideoConverterResult = {
+export type BaseJobResult = {
   commandID: string;
   duration: number;
   durationPretty: string;
   success: boolean;
 }
 
-export type CommandCheckResult = BaseVideoConverterResult & {
+export type CommandCheckResult = BaseJobResult & {
   results: Array<{
     command: string,
     args: string[],
@@ -130,13 +131,13 @@ export type CommandCheckResult = BaseVideoConverterResult & {
   }>;
 }
 
-export type VideoGetInfoResult = BaseVideoConverterResult & {
+export type VideoGetInfoResult = BaseJobResult & {
   size: number;
   videoInfo: VideoInfo;
   sourceFileFullPath: string;
 }
 
-export type VideoConvertResult = BaseVideoConverterResult & {
+export type VideoConvertResult = BaseJobResult & {
   targetFileFullPath: string;
   convertedFileSize: number;
   prettyConvertedFileSize: string;

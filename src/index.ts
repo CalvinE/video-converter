@@ -1,6 +1,6 @@
 import { IJobFileManager, JobFileManager } from './JobFileManager';
 import { basename, extname, join, resolve } from 'path';
-import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJob, GetInfoJob, CopyJob, INVALID, JobsArray, getJobID, JobFile, Job } from './VideoConverter/models';
+import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJobOptions, GetInfoJobOptions, CopyJobOptions, INVALID, JobsArray, getJobID, JobFile, Job } from './VideoConverter/models';
 import { IOutputWriter } from './OutputWriter/models';
 import { ConsoleOutputWriter } from './OutputWriter/ConsoleOutputWriter';
 import { FileManager, FSItem, FileInfo } from './FileManager';
@@ -354,7 +354,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         return false;
     }
 
-    function makeJob(logger: ILogger, task: Task, fileInfo: FileInfo, appOptions: AppOptions): (ConvertJob | GetInfoJob | CopyJob) {
+    function makeJob(logger: ILogger, task: Task, fileInfo: FileInfo, appOptions: AppOptions): (ConvertJobOptions | GetInfoJobOptions | CopyJobOptions) {
         const commandID = getJobCommandID(task);
         logger.LogVerbose(`making job of type ${task}`, { fileInfo, appOptions, task });
         if (task === "convert") {
@@ -442,7 +442,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appLogger.LogInfo("help command finished", {});
     }
 
-    async function processGetInfo(_logger: ILogger, _outputWriter: IOutputWriter, job: GetInfoJob): Promise<VideoGetInfoResult> {
+    async function processGetInfo(_logger: ILogger, _outputWriter: IOutputWriter, job: GetInfoJobOptions): Promise<VideoGetInfoResult> {
         _outputWriter.writeLine(`getting file info: ${job.fileInfo.fullPath}`);
         const details = await ffmpegVideoConverter.getVideoInfo(job.fileInfo, {
             commandID: job.commandID,
@@ -567,7 +567,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         return makeProgressiveUpdateFunction;
     }
 
-    async function processVideoConvertCommand(logger: ILogger, outputWriter: IOutputWriter, job: ConvertJob): Promise<VideoConvertResult> {
+    async function processVideoConvertCommand(logger: ILogger, outputWriter: IOutputWriter, job: ConvertJobOptions): Promise<VideoConvertResult> {
         logger.LogDebug("getting video file info so that we can calculate progressive updates", { commandID: job.commandID, })
         const videoInfoResult = await ffmpegVideoConverter.getVideoInfo(job.fileInfo, {
             commandID: job.commandID,

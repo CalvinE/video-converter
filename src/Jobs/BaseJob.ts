@@ -1,3 +1,5 @@
+import { FileInfo, IFileManager } from './../FileManager';
+import { BaseJobOptions, BaseJobResult } from './../VideoConverter/models';
 import { IOutputWriter } from './../OutputWriter';
 import { ILogger } from "../Logger";
 
@@ -7,14 +9,47 @@ import { ILogger } from "../Logger";
  * In essence the code for running specific command types will be in these classes.
  * TODO: additionally I will need to make an abstract factory for these based on task name?
  */
-export abstract class BaseJob<T> { // TODO: have a base job options thing T must extend?
+export abstract class BaseJob<O extends BaseJobOptions, R extends BaseJobResult> {
 
     protected _logger: ILogger;
     protected _outputWriter: IOutputWriter;
-    constructor(logger: ILogger, outputWriter: IOutputWriter) {
+    protected _fileManager: IFileManager;
+    protected _jobOptions: O;
+
+    public success: boolean;
+    public durationMilliseconds: number;
+    public sizeBytesChange: number;
+    public sourceFile: FileInfo;
+    public targetFile?: FileInfo;
+
+    constructor(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, jobOptions: O) {
         this._logger = logger;
         this._outputWriter = outputWriter;
+        this._fileManager = fileManager
+        this._jobOptions = jobOptions;
+        this.success = false;
+        this.durationMilliseconds = 0;
+        this.sizeBytesChange = 0;
+        this.sourceFile = jobOptions.fileInfo;
     }
 
-    public abstract execute(): Promise<T>;
+    public abstract validateJobOptions(): boolean
+
+    protected abstract _execute(): Promise<R>;
+
+    public async execute(): Promise<R> {
+        const result = await this._execute();
+        return result;
+    }
+
+    public GetJobTaskName(): string {
+        return this._jobOptions.task;
+    }
+
+
+
+    public GetSourceFileInfo(): FileInfo {
+        return this._jobOptions.fileInfo;
+    }
+
 }
