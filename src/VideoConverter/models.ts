@@ -115,14 +115,17 @@ export type VideoConvertOptions = BaseVideoConverterOptions & {
   targetAudioEncoding: AudioEncoder;
 };
 
-type BaseVideoConverterResult = {
+type BaseVideoCommandResult = {
   commandID: string;
   duration: number;
   durationPretty: string;
   success: boolean;
+  statusCode: number;
+  commandStdOutput?: string[];
+  commandErrOutput?: string[];
 }
 
-export type CommandCheckResult = BaseVideoConverterResult & {
+export type CommandCheckResult = BaseVideoCommandResult & {
   results: Array<{
     command: string,
     args: string[],
@@ -130,13 +133,13 @@ export type CommandCheckResult = BaseVideoConverterResult & {
   }>;
 }
 
-export type VideoGetInfoResult = BaseVideoConverterResult & {
+export type VideoGetInfoResult = BaseVideoCommandResult & {
   size: number;
   videoInfo: VideoInfo;
   sourceFileFullPath: string;
 }
 
-export type VideoConvertResult = BaseVideoConverterResult & {
+export type VideoConvertResult = BaseVideoCommandResult & {
   targetFileFullPath: string;
   convertedFileSize: number;
   prettyConvertedFileSize: string;
