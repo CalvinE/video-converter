@@ -44,15 +44,15 @@ export type CopyJobOptions = BaseJobOptions & {
 
 export type JobOptions = (ConvertJobOptions | GetInfoJobOptions | CopyJobOptions);
 
-export type Job = CopyJobOptions | ConvertJobOptions | GetInfoJobOptions;
+// export type Job = CopyJobOptions | ConvertJobOptions | GetInfoJobOptions;
 
-export type JobsArray = Array<Job>;
+export type JobsOptionsArray = Array<JobOptions>;
 
 export type JobFile = {
   jobID: string;
   jobName: string;
   options: AppOptions;
-  jobs: JobsArray;
+  jobs: JobsOptionsArray;
   numJobs: number;
   numCompletedJobs: number;
   numFailedJobs: number;

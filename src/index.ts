@@ -20,10 +20,9 @@ import {
     getJobCommandID,
     SubCommand,
     INVALID,
-    JobsArray,
+    JobsOptionsArray,
     getJobID,
     JobFile,
-    Job,
     ConvertJobOptions,
     GetInfoJobOptions,
     JobOptions
@@ -312,22 +311,22 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         await appLogger.shutdown();
     }
 
-    function handleJobFailureCleanup(logger: ILogger, outputWriter: IOutputWriter, job: Job) {
-        delete job.failureReason;
+    function handleJobFailureCleanup(logger: ILogger, outputWriter: IOutputWriter, jobOptions: JobOptions) {
+        delete jobOptions.failureReason;
         let targetFileFullPath: string;
-        if (job.task === "convert") {
-            targetFileFullPath = job.options.targetFileFullPath;
-            delete job.result?.commandErrOutput;
-            delete job.result?.commandStdOutput;
-        } else if (job.task === "copy") {
-            targetFileFullPath = job.targetFileFullPath;
+        if (jobOptions.task === "convert") {
+            targetFileFullPath = jobOptions.options.targetFileFullPath;
+            delete jobOptions.result?.commandErrOutput;
+            delete jobOptions.result?.commandStdOutput;
+        } else if (jobOptions.task === "copy") {
+            targetFileFullPath = jobOptions.targetFileFullPath;
         } else {
-            delete job.result?.commandErrOutput;
-            delete job.result?.commandStdOutput;
-            logger.LogVerbose("job type does not require cleanup.", { job })
+            delete jobOptions.result?.commandErrOutput;
+            delete jobOptions.result?.commandStdOutput;
+            logger.LogVerbose("job type does not require cleanup.", { job: jobOptions })
             return;
         }
-        logger.LogDebug("attempting to clean up failed job data.", { job });
+        logger.LogDebug("attempting to clean up failed job data.", { job: jobOptions });
         outputWriter.writeLine(`attempting to delete target file if it exists ${targetFileFullPath}`);
         fileManager.safeUnlinkFile(targetFileFullPath);
         if (fileManager.exists(targetFileFullPath)) {
@@ -463,10 +462,10 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         throw error;
     }
 
-    function getAllJobs(logger: ILogger, subCommand: SubCommand, items: FSItem[], options: AppOptions): JobsArray {
+    function getAllJobs(logger: ILogger, subCommand: SubCommand, items: FSItem[], options: AppOptions): JobsOptionsArray {
         logger.LogDebug("getting all files based on parameters", { targetFileNameRegex: options.targetFileNameRegex?.source, allowedFileExtensions: options.allowedFileExtensions })
         const allowCopy = !options.saveInPlace;
-        const jobs: JobsArray = [];
+        const jobs: JobsOptionsArray = [];
         for (const item of items) {
             if (item.type === "file") {
                 if (doesFileMatchCriteria(logger, item, subCommand, options.allowedFileExtensions, options.targetFileNameRegex)) {
@@ -482,7 +481,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                     logger.LogDebug("file name does not match the selection criteria", { fileName: item.name });
                 }
             } else if (item.type === 'directory') {
-                const subItems: JobsArray = getAllJobs(logger, subCommand, item.files, options);
+                const subItems: JobsOptionsArray = getAllJobs(logger, subCommand, item.files, options);
                 jobs.push(...subItems);
             }
         }

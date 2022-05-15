@@ -3,10 +3,10 @@ import { dirname, resolve } from 'path';
 import { IFileManager } from './FileManager';
 import { ILogger } from './Logger';
 import { bytesToHumanReadableBytes, millisecondsToHHMMSS } from './PrettyPrint';
-import { JobFile, Job } from './VideoConverter/models';
+import { JobFile, JobOptions } from './VideoConverter/models';
 
 export interface IJobFileManager {
-    updateJob(job: Job): void;
+    updateJob(job: JobOptions): void;
     writeJobFileData(): void;
     readJobFileData(): JobFile;
     shutdownAndFlush(): Promise<void>
@@ -86,7 +86,7 @@ export class JobFileManager implements IJobFileManager {
         return Promise.resolve();
     }
 
-    private updateJobFileStatistics(job: Job) {
+    private updateJobFileStatistics(job: JobOptions) {
         this._logger.LogDebug("updating job file statistics", {});
         if (job.result != undefined) {
             if (job.task === "convert") {
@@ -130,7 +130,7 @@ export class JobFileManager implements IJobFileManager {
         }
     }
 
-    public updateJob(job: Job): void {
+    public updateJob(job: JobOptions): void {
         this._logger.LogInfo("updating job file data for job", { commandID: job.commandID });
         const jobIndex = this._jobFileData.jobs.findIndex((j) => j.commandID === job.commandID);
         if (jobIndex >= 0) {
