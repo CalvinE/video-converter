@@ -1,8 +1,23 @@
-import { IFileManager } from './../../FileManager';
-import { CommandCheckResult, CommandStdErrMessageReceivedEventData, GetVideoInfoOptions, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoInfo } from './../models';
-import { ILogger } from './../../Logger/Logger';
-import { FileInfo } from "../../FileManager";
-import { CommandRunner } from "../CommandRunner";
+import {
+    IFileManager
+} from './../../FileManager';
+import {
+    CommandCheckResult,
+    CommandStdErrMessageReceivedEventData,
+    GetVideoInfoOptions,
+    VideoConverterEventName_StdErrMessageReceived,
+    VideoGetInfoResult,
+    VideoInfo
+} from './../models';
+import {
+    ILogger
+} from './../../Logger/Logger';
+import {
+    FileInfo
+} from "../../FileManager";
+import {
+    CommandRunner
+} from "../CommandRunner";
 import {
     VideoConvertOptions,
     IVideoConverter,
@@ -20,8 +35,13 @@ import {
     VideoConverterEventName_Timedout,
     VideoConvertResult,
 } from "../models";
-import { dirname } from 'path';
-import { bytesToHumanReadableBytes, millisecondsToHHMMSS } from '../../PrettyPrint';
+import {
+    dirname
+} from 'path';
+import {
+    bytesToHumanReadableBytes,
+    millisecondsToHHMMSS
+} from '../../PrettyPrint';
 
 export class FFMPEGVideoConverter extends CommandRunner implements IVideoConverter {
 
