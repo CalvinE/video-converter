@@ -1,8 +1,23 @@
-import { IFileManager } from './../../FileManager';
-import { CommandCheckResult, CommandStdErrMessageReceivedEventData, GetVideoInfoOptions, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoInfo } from './../models';
-import { ILogger } from './../../Logger/Logger';
-import { FileInfo } from "../../FileManager";
-import { CommandRunner } from "../CommandRunner";
+import {
+    IFileManager
+} from './../../FileManager';
+import {
+    CommandCheckResult,
+    CommandStdErrMessageReceivedEventData,
+    GetVideoInfoOptions,
+    VideoConverterEventName_StdErrMessageReceived,
+    VideoGetInfoResult,
+    VideoInfo
+} from './../models';
+import {
+    ILogger
+} from './../../Logger/Logger';
+import {
+    FileInfo
+} from "../../FileManager";
+import {
+    CommandRunner
+} from "../CommandRunner";
 import {
     VideoConvertOptions,
     IVideoConverter,
@@ -20,8 +35,13 @@ import {
     VideoConverterEventName_Timedout,
     VideoConvertResult,
 } from "../models";
-import { dirname } from 'path';
-import { bytesToHumanReadableBytes, millisecondsToHHMMSS } from '../../PrettyPrint';
+import {
+    dirname
+} from 'path';
+import {
+    bytesToHumanReadableBytes,
+    millisecondsToHHMMSS
+} from '../../PrettyPrint';
 
 export class FFMPEGVideoConverter extends CommandRunner implements IVideoConverter {
 
@@ -41,22 +61,25 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this._logger.LogVerbose("checking to see if command can be run.", { command: this._ffmpegCommand });
         const checkCommandsCommandID = "checkCommands";
         const ffmpegArgs = ["-h"];
-        const ffmpegResult = await this.executeCommand(this._ffmpegCommand, ffmpegArgs, checkCommandsCommandID, 10000000);
-        this._logger.LogVerbose("finished check of command", ffmpegResult);
+        const commandResult = await this.executeCommand(this._ffmpegCommand, ffmpegArgs, checkCommandsCommandID, 10000000);
+        this._logger.LogVerbose("finished check of command", commandResult);
         const ffprobeArgs = ["-L"];
         const ffprobeResult = await this.executeCommand(this._ffprobeCommand, ffprobeArgs, checkCommandsCommandID, 10000000);
         this._logger.LogVerbose("finished check of command", ffprobeResult);
-        const duration = ffmpegResult.durationMilliseconds + ffprobeResult.durationMilliseconds;
+        const duration = commandResult.durationMilliseconds + ffprobeResult.durationMilliseconds;
         return {
             commandID: checkCommandsCommandID,
-            success: ffmpegResult.success === true && ffprobeResult.success === true,
+            success: commandResult.success === true && ffprobeResult.success === true,
             duration: duration,
             durationPretty: millisecondsToHHMMSS(duration),
+            statusCode: commandResult.exitCode ?? -999,
+            commandErrOutput: commandResult.success ? commandResult.fullStdErrOutput : undefined,
+            commandStdOutput: commandResult.success ? commandResult.fullOutput : undefined,
             results: [
                 {
                     command: this._ffmpegCommand,
                     args: ffmpegArgs,
-                    success: ffmpegResult.success,
+                    success: commandResult.success,
                 },
                 {
                     command: this._ffprobeCommand,
@@ -107,17 +130,20 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             ...options.xArgs,
             `"${sourceFile.fullPath}"`,
         ];
-        const commandResults = await this.executeCommand(this._ffprobeCommand, args, `GetVideoInfo-${options.commandID}`, options.timeoutMilliseconds);
-        const joinedCommandOutput = commandResults.fullOutput.join("");
+        const commandResult = await this.executeCommand(this._ffprobeCommand, args, `GetVideoInfo-${options.commandID}`, options.timeoutMilliseconds);
+        const joinedCommandOutput = commandResult.fullOutput.join("");
         const videoInfo: VideoInfo = JSON.parse(joinedCommandOutput);
         this._logger.LogVerbose("video info retrieved", { videoInfo })
         return {
             commandID: options.commandID,
-            duration: commandResults.durationMilliseconds,
-            durationPretty: millisecondsToHHMMSS(commandResults.durationMilliseconds),
+            duration: commandResult.durationMilliseconds,
+            durationPretty: millisecondsToHHMMSS(commandResult.durationMilliseconds),
             size: sourceFile.size,
             sourceFileFullPath: sourceFile.fullPath,
-            success: commandResults.success,
+            success: commandResult.success,
+            statusCode: commandResult.exitCode ?? -999,
+            commandErrOutput: commandResult.success ? commandResult.fullStdErrOutput : undefined,
+            commandStdOutput: commandResult.success ? commandResult.fullOutput : undefined,
             videoInfo,
         };
     }
@@ -155,6 +181,9 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                 sizeDifferencePretty: bytesToHumanReadableBytes(sizeDiff),
                 convertedFileSize: targetFileInfo.size,
                 prettyConvertedFileSize: bytesToHumanReadableBytes(targetFileInfo.size),
+                statusCode: commandResult.exitCode ?? -999,
+                commandErrOutput: commandResult.success ? commandResult.fullStdErrOutput : undefined,
+                commandStdOutput: commandResult.success ? commandResult.fullOutput : undefined,
             }
         }
         return {
@@ -168,6 +197,9 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             sizeDifferencePretty: bytesToHumanReadableBytes(0),
             convertedFileSize: 0,
             prettyConvertedFileSize: bytesToHumanReadableBytes(0),
+            statusCode: commandResult.exitCode ?? -999,
+            commandErrOutput: commandResult.success ? commandResult.fullStdErrOutput : undefined,
+            commandStdOutput: commandResult.success ? commandResult.fullOutput : undefined,
         }
     }
 }

@@ -1,9 +1,34 @@
-import { spawn } from 'child_process';
-import { EventEmitter } from 'stream';
-import { setTimeout } from 'timers';
-import { ILogger } from '../Logger/Logger';
-import { millisecondsToHHMMSS } from '../PrettyPrint';
-import { CommandErroredEventData, CommandStateName_Errored, CommandFinishedEventData, CommandStateName_Finished, CommandStdOutMessageReceivedEventData, CommandRunningEventData, CommandStateName_Running, CommandStartedEventData, CommandStateName_Started, CommandState, CommandTimedoutEventData, CommandStateName_TimedOut, CommandStdErrMessageReceivedEventData, CommandCheckResult } from './models';
+import {
+    spawn
+} from 'child_process';
+import {
+    EventEmitter
+} from 'stream';
+import {
+    setTimeout
+} from 'timers';
+import {
+    ILogger
+} from '../Logger/Logger';
+import {
+    millisecondsToHHMMSS
+} from '../PrettyPrint';
+import {
+    CommandErroredEventData,
+    CommandStateName_Errored,
+    CommandFinishedEventData,
+    CommandStateName_Finished,
+    CommandStdOutMessageReceivedEventData,
+    CommandRunningEventData,
+    CommandStateName_Running,
+    CommandStartedEventData,
+    CommandStateName_Started,
+    CommandState,
+    CommandTimedoutEventData,
+    CommandStateName_TimedOut,
+    CommandStdErrMessageReceivedEventData,
+    CommandCheckResult
+} from './models';
 
 export type CommandResult = {
     commandId: string,

@@ -1,13 +1,61 @@
-import { IJobFileManager, JobFileManager } from './JobFileManager';
-import { basename, extname, join, resolve } from 'path';
-import { CommandStdErrMessageReceivedEventData, VideoConverterEventName_StdErrMessageReceived, VideoGetInfoResult, VideoStreamInfo, VideoConvertOptions, VideoConvertResult, GetVideoInfoOptions, Task, getJobCommandID, SubCommand, ConvertJobOptions, GetInfoJobOptions, CopyJobOptions, INVALID, JobsArray, getJobID, JobFile, Job } from './VideoConverter/models';
-import { IOutputWriter } from './OutputWriter/models';
-import { ConsoleOutputWriter } from './OutputWriter/ConsoleOutputWriter';
-import { FileManager, FSItem, FileInfo } from './FileManager';
-import { FileLogger, ILogger } from './Logger';
-import { FFMPEGVideoConverter } from './VideoConverter';
-import { AppOptions, ParseOptions, PrintHelp } from './OptionsParser';
-import { bytesToHumanReadableBytes, HHMMSSmmToSeconds, millisecondsToHHMMSS } from './PrettyPrint';
+import {
+    IJobFileManager,
+    JobFileManager
+} from './JobFileManager';
+import {
+    basename,
+    extname,
+    join,
+    resolve
+} from 'path';
+import {
+    CommandStdErrMessageReceivedEventData,
+    VideoConverterEventName_StdErrMessageReceived,
+    VideoGetInfoResult,
+    VideoStreamInfo,
+    VideoConvertOptions,
+    VideoConvertResult,
+    GetVideoInfoOptions,
+    Task,
+    getJobCommandID,
+    SubCommand,
+    INVALID,
+    JobsArray,
+    getJobID,
+    JobFile,
+    Job,
+    ConvertJobOptions,
+    GetInfoJobOptions,
+    JobOptions
+} from './VideoConverter/models';
+import {
+    IOutputWriter
+} from './OutputWriter/models';
+import {
+    ConsoleOutputWriter
+} from './OutputWriter/ConsoleOutputWriter';
+import {
+    FileManager,
+    FSItem,
+    FileInfo
+} from './FileManager';
+import {
+    FileLogger,
+    ILogger
+} from './Logger';
+import {
+    FFMPEGVideoConverter
+} from './VideoConverter';
+import {
+    AppOptions,
+    ParseOptions,
+    PrintHelp
+} from './OptionsParser';
+import {
+    bytesToHumanReadableBytes,
+    HHMMSSmmToSeconds,
+    millisecondsToHHMMSS
+} from './PrettyPrint';
 
 const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
 const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
@@ -265,12 +313,17 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
     }
 
     function handleJobFailureCleanup(logger: ILogger, outputWriter: IOutputWriter, job: Job) {
+        delete job.failureReason;
         let targetFileFullPath: string;
         if (job.task === "convert") {
             targetFileFullPath = job.options.targetFileFullPath;
+            delete job.result?.commandErrOutput;
+            delete job.result?.commandStdOutput;
         } else if (job.task === "copy") {
             targetFileFullPath = job.targetFileFullPath;
         } else {
+            delete job.result?.commandErrOutput;
+            delete job.result?.commandStdOutput;
             logger.LogVerbose("job type does not require cleanup.", { job })
             return;
         }
@@ -354,7 +407,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         return false;
     }
 
-    function makeJob(logger: ILogger, task: Task, fileInfo: FileInfo, appOptions: AppOptions): (ConvertJobOptions | GetInfoJobOptions | CopyJobOptions) {
+    function makeJob(logger: ILogger, task: Task, fileInfo: FileInfo, appOptions: AppOptions): JobOptions {
         const commandID = getJobCommandID(task);
         logger.LogVerbose(`making job of type ${task}`, { fileInfo, appOptions, task });
         if (task === "convert") {

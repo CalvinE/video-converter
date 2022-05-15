@@ -42,6 +42,8 @@ export type CopyJobOptions = BaseJobOptions & {
   result?: boolean;
 };
 
+export type JobOptions = (ConvertJobOptions | GetInfoJobOptions | CopyJobOptions);
+
 export type Job = CopyJobOptions | ConvertJobOptions | GetInfoJobOptions;
 
 export type JobsArray = Array<Job>;
@@ -121,6 +123,9 @@ export type BaseJobResult = {
   duration: number;
   durationPretty: string;
   success: boolean;
+  statusCode: number;
+  commandStdOutput?: string[];
+  commandErrOutput?: string[];
 }
 
 export type CommandCheckResult = BaseJobResult & {

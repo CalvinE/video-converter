@@ -1,6 +1,24 @@
-import { ILogger } from './Logger/Logger';
-import { basename, dirname, extname, join, relative, resolve } from 'path';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
+import {
+    ILogger
+} from './Logger/Logger';
+import {
+    basename,
+    dirname,
+    extname,
+    join,
+    relative,
+    resolve
+} from 'path';
+import {
+    copyFileSync,
+    existsSync,
+    lstatSync,
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    unlinkSync,
+    writeFileSync
+} from 'fs';
 
 type BaseFSItem = {
     fullPath: string;
