@@ -6,7 +6,7 @@ import {
     CommandStdErrMessageReceivedEventData,
     GetVideoInfoOptions,
     VideoConverterEventName_StdErrMessageReceived,
-    VideoGetInfoResult,
+    GetVideoInfoResult,
     VideoInfo
 } from './../models';
 import {
@@ -33,7 +33,7 @@ import {
     VideoConverterEventName_Finished,
     VideoConverterEventName_Errored,
     VideoConverterEventName_Timedout,
-    VideoConvertResult,
+    ConvertVideoResult,
 } from "../models";
 import {
     dirname
@@ -118,7 +118,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this.emit(VideoConverterEventName_Timedout, data);
     }
 
-    public async getVideoInfo(sourceFile: FileInfo, options: GetVideoInfoOptions): Promise<VideoGetInfoResult> {
+    public async getVideoInfo(sourceFile: FileInfo, options: GetVideoInfoOptions): Promise<GetVideoInfoResult> {
         const args = [
             "-hide_banner",
             "-v",
@@ -148,7 +148,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         };
     }
 
-    public async convertVideo(sourceFile: FileInfo, options: VideoConvertOptions): Promise<VideoConvertResult> {
+    public async convertVideo(sourceFile: FileInfo, options: VideoConvertOptions): Promise<ConvertVideoResult> {
         this._logger.LogDebug("attempting to convert a video", { sourceFile, options });
         const targetFilePath: string = dirname(options.targetFileFullPath)
         this._fileManager.makeDir(targetFilePath);

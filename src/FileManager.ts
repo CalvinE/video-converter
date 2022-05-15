@@ -63,9 +63,9 @@ export interface IFileManager {
 
     writeFile: (targetFileFullPath: string, content: string, truncate: boolean) => void;
 
-    safeUnlinkFile: (targetFileFullPath: string) => void;
+    safeUnlinkFile: (targetFileFullPath: string) => boolean;
 
-    unlinkFile: (targetFileFullPath: string) => void;
+    unlinkFile: (targetFileFullPath: string) => boolean;
 
     exists: (path: string) => boolean;
 }
@@ -109,15 +109,17 @@ export class FileManager implements IFileManager {
         return existsSync(path);
     }
 
-    public unlinkFile(targetFileFullPath: string) {
-        unlinkSync(targetFileFullPath)
+    public unlinkFile(targetFileFullPath: string): boolean {
+        unlinkSync(targetFileFullPath);
+        return true;
     }
 
-    public safeUnlinkFile(targetFileFullPath: string) {
+    public safeUnlinkFile(targetFileFullPath: string): boolean {
         try {
-            this.unlinkFile(targetFileFullPath)
+            return this.unlinkFile(targetFileFullPath);
         } catch (error) {
-            this._logger.LogWarn("unable to unlink file", { error })
+            this._logger.LogWarn("unable to unlink file", { error });
+            return false;
         }
     }
 

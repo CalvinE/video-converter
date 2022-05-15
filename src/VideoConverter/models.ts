@@ -21,19 +21,24 @@ export type BaseJobOptions = {
   failureReason?: string;
   fileInfo: FileInfo;
   state: State;
-  task: string;
+  task: Task;
 }
 
-export type ConvertJobOptions = BaseJobOptions & {
+export type VideoCommandJobOptions = BaseJobOptions & {
+  baseCommand: string;
+};
+
+export type ConvertJobOptions = VideoCommandJobOptions & {
   task: "convert";
+  getInfoCommand: string;
   options: VideoConvertOptions;
-  result?: VideoConvertResult;
+  result?: ConvertVideoResult;
 }
 
-export type GetInfoJobOptions = BaseJobOptions & {
+export type GetInfoJobOptions = VideoCommandJobOptions & {
   task: "getinfo";
   options: GetVideoInfoOptions;
-  result?: VideoGetInfoResult;
+  result?: GetVideoInfoResult;
 }
 
 export type CopyJobOptions = BaseJobOptions & {
@@ -116,6 +121,7 @@ export type VideoConvertOptions = BaseVideoConverterOptions & {
   targetFileFullPath: string;
   targetVideoEncoding: VideoEncoder;
   targetAudioEncoding: AudioEncoder;
+  targetContainerFormat: VideoContainerFormat;
 };
 
 export type BaseJobResult = {
@@ -136,14 +142,15 @@ export type CommandCheckResult = BaseJobResult & {
   }>;
 }
 
-export type VideoGetInfoResult = BaseJobResult & {
+export type GetVideoInfoResult = BaseJobResult & {
   size: number;
   videoInfo: VideoInfo;
   sourceFileFullPath: string;
 }
 
-export type VideoConvertResult = BaseJobResult & {
+export type ConvertVideoResult = BaseJobResult & {
   targetFileInfo?: FileInfo;
+  targetVideoInfo?: VideoInfo
   convertedFileSize: number;
   prettyConvertedFileSize: string;
   sizeDifference: number;
@@ -189,8 +196,8 @@ export type CommandTimedoutEventData = BaseVideoConverterEvent & {
 
 
 export interface IVideoConverter {
-  getVideoInfo: (sourceFile: FileInfo, options: GetVideoInfoOptions) => Promise<VideoGetInfoResult>;
-  convertVideo: (sourceFile: FileInfo, options: VideoConvertOptions) => Promise<VideoConvertResult>;
+  getVideoInfo: (sourceFile: FileInfo, options: GetVideoInfoOptions) => Promise<GetVideoInfoResult>;
+  convertVideo: (sourceFile: FileInfo, options: VideoConvertOptions) => Promise<ConvertVideoResult>;
 }
 
 export function getVideoInfoCommandID(): string {

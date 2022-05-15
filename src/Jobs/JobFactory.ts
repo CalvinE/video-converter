@@ -1,18 +1,26 @@
-// import { IFileManager } from '../FileManager';
-// import { ILogger } from '../Logger';
-// import { IOutputWriter } from '../OutputWriter';
-// import { BaseJobOptions } from '../VideoConverter/models';
-// import { BaseJob, IJob } from './BaseJob';
+import { CopyJobOptions, GetInfoJobOptions, ConvertJobOptions } from './../VideoConverter/models';
+import { IFileManager } from '../FileManager';
+import { ILogger } from '../Logger';
+import { IOutputWriter } from '../OutputWriter';
+import { BaseJobOptions } from '../VideoConverter/models';
+import { ConvertVideoJob } from './ConvertVideoJob';
+import { CopyJob } from './CopyJob';
+import { GetVideoInfoJob } from './GetVideoInfoJob';
 
-// export class JobFactory {
-//     private static jobRegistry: Record<string, IJob> = {};
+type Job = CopyJob | ConvertVideoJob | GetVideoInfoJob;
 
-//     public static registerJob(jobName: string, c: IJob) {
-//         JobFactory.jobRegistry[jobName] = c;
-//     }
-
-//     public static MakeJob(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, options: BaseJobOptions): IJob {
-//         const ctor = JobFactory.jobRegistry[options.task];
-//         return new ctor(logger, outputWriter, fileManager, options);
-//     }
-// }
+// FIXME: make this work from an object for key to job constructors. add ability to register new jobs at run time?
+export class JobFactory {
+    public static MakeJob(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, options: BaseJobOptions): Job {
+        switch (options.task) {
+            case "copy":
+                return new CopyJob(logger, outputWriter, fileManager, options as CopyJobOptions);
+            case "getinfo":
+                return new GetVideoInfoJob(logger, outputWriter, fileManager, options as GetInfoJobOptions)
+            case "convert":
+                return new ConvertVideoJob(logger, outputWriter, fileManager, options as ConvertJobOptions);
+            default:
+                throw new Error("invalid job type...");
+        }
+    }
+}
