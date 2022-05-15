@@ -242,6 +242,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                     targetFile = result.targetFileInfo?.fullPath ?? "";
                     job.state = "completed";
                     job.result = result;
+                    success = result.success;
                 } else {
                     /// We should not be allowed to get here...
                     appLogger.LogWarn("job with invalid task encountered...", job);

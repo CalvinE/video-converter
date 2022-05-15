@@ -3,6 +3,11 @@ import { BaseJobOptions, BaseJobResult } from './../VideoConverter/models';
 import { IOutputWriter } from './../OutputWriter';
 import { ILogger } from "../Logger";
 
+export interface IJob {
+    // new(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, jobOptions: BaseJobOptions): BaseJob<BaseJobOptions, BaseJobResult>;
+    execute(): Promise<BaseJobResult>;
+}
+
 /**
  * The idea here is to abstract the individual jobs in a job file to this class.
  * The class will call commands that will do what they need to do.
@@ -45,8 +50,6 @@ export abstract class BaseJob<O extends BaseJobOptions, R extends BaseJobResult>
     public GetJobTaskName(): string {
         return this._jobOptions.task;
     }
-
-
 
     public GetSourceFileInfo(): FileInfo {
         return this._jobOptions.fileInfo;
