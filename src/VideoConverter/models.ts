@@ -13,7 +13,7 @@ export type SubCommand = "convert" | "getinfo" | `${typeof INVALID}`;
 
 export type Task = SubCommand | `${typeof COPY}`;
 
-export type State = "pending" | "running" | "completed" | "error";
+export type State = "pending" | "running" | "completed" | "error" | "invalidfile";
 
 export type BaseJobOptions = {
   commandID: string;
@@ -39,7 +39,7 @@ export type GetInfoJobOptions = BaseJobOptions & {
 export type CopyJobOptions = BaseJobOptions & {
   task: "copy";
   targetFileFullPath: string;
-  result?: boolean;
+  result?: CopyResult;
 };
 
 export type JobOptions = (ConvertJobOptions | GetInfoJobOptions | CopyJobOptions);
@@ -143,12 +143,16 @@ export type VideoGetInfoResult = BaseJobResult & {
 }
 
 export type VideoConvertResult = BaseJobResult & {
-  targetFileFullPath: string;
+  targetFileInfo?: FileInfo;
   convertedFileSize: number;
   prettyConvertedFileSize: string;
   sizeDifference: number;
   sizeDifferencePretty: string;
   sourceFileFullPath: string;
+};
+
+export type CopyResult = BaseJobResult & {
+  targetFileInfo?: FileInfo;
 };
 
 type BaseVideoConverterEvent = {

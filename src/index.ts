@@ -25,7 +25,9 @@ import {
     JobFile,
     ConvertJobOptions,
     GetInfoJobOptions,
-    JobOptions
+    JobOptions,
+    CopyJobOptions,
+    CopyResult
 } from './VideoConverter/models';
 import {
     IOutputWriter
@@ -222,7 +224,7 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                     totalSizeReduction += result.sizeDifference;
                     sizeBytesReduction = result.sizeDifference;
                     sourceFile = result.sourceFileFullPath;
-                    targetFile = result.targetFileFullPath;
+                    targetFile = result.targetFileInfo?.fullPath ?? "";
                     job.state = "completed";
                     job.result = result;
                     success = result.success;
@@ -234,15 +236,12 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
                     job.result = result;
                     success = result.success
                 } else if (job.task === "copy") {
+                    const result = await processCopy(appLogger, appOutputWriter, job);
+                    durationMilliseconds = result.duration;
                     sourceFile = job.fileInfo.fullPath;
-                    const targetFile = job.targetFileFullPath;
-                    appOutputWriter.writeLine(`copying file: ${sourceFile} => ${targetFile}`);
-                    const now = Date.now();
-                    success = fileManager.copyFile(sourceFile, targetFile);
-                    const then = Date.now();
-                    durationMilliseconds = then - now;
+                    targetFile = result.targetFileInfo?.fullPath ?? "";
                     job.state = "completed";
-                    job.result = success;
+                    job.result = result;
                 } else {
                     /// We should not be allowed to get here...
                     appLogger.LogWarn("job with invalid task encountered...", job);
@@ -492,6 +491,32 @@ const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
         appLogger.LogInfo("help command invoked", {});
         PrintHelp();
         appLogger.LogInfo("help command finished", {});
+    }
+
+    async function processCopy(_logger: ILogger, _outputWriter: IOutputWriter, job: CopyJobOptions): Promise<CopyResult> {
+        return new Promise((resolve) => {
+            const start = Date.now();
+            const sourceFile = job.fileInfo.fullPath;
+            const targetFile = job.fileInfo.fullPath;
+            appOutputWriter.writeLine(`copying file: ${sourceFile} => ${targetFile}`);
+            const success = fileManager.copyFile(sourceFile, targetFile);
+            let targetFileInfo: FileInfo | undefined;
+            let statusCode = -1;
+            if (success === true) {
+                statusCode = 0;
+                targetFileInfo = (fileManager.getFSItemFromPath(targetFile) as FileInfo);
+            }
+            const end = Date.now();
+            const duration = end - start;
+            resolve({
+                commandID: job.commandID,
+                duration,
+                durationPretty: millisecondsToHHMMSS(duration),
+                statusCode,
+                success,
+                targetFileInfo,
+            });
+        });
     }
 
     async function processGetInfo(_logger: ILogger, _outputWriter: IOutputWriter, job: GetInfoJobOptions): Promise<VideoGetInfoResult> {

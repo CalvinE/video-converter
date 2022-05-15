@@ -9,6 +9,7 @@
         "framenumber",
         "getinfo",
         "hwaccel",
+        "invalidfile",
         "libx",
         "sarg",
         "Timedout",
