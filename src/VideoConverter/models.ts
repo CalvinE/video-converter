@@ -149,6 +149,7 @@ export type GetVideoInfoResult = BaseJobResult & {
 }
 
 export type ConvertVideoResult = BaseJobResult & {
+  sourceVideoInfo?: VideoInfo;
   targetFileInfo?: FileInfo;
   targetVideoInfo?: VideoInfo
   convertedFileSize: number;

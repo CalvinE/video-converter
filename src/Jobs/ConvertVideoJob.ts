@@ -30,7 +30,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoResu
             timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
             xArgs: [],
         })
-        if (videoInfoResult.success !== false) {
+        if (videoInfoResult.success === false) {
             this._logger.LogWarn("failed to get video info", { videoInfoResult })
         }
         this._outputWriter.writeLine(`converting file: ${this._jobOptions.fileInfo.fullPath}`);
@@ -50,6 +50,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoResu
         ffmpegConvertCommand.on(VideoConverterEventName_StdErrMessageReceived, outputHandler);
         const convertResult = await convertPromise
         ffmpegConvertCommand.off(VideoConverterEventName_StdErrMessageReceived, outputHandler);
+        convertResult.sourceVideoInfo = videoInfoResult.success === true ? videoInfoResult.videoInfo : undefined;
         if (convertResult.success === true) {
             convertResult.targetFileInfo = this._fileManager.getFSItemFromPath(this._jobOptions.options.targetFileFullPath) as FileInfo;
             const targetFileVideoInfoCommand = new FFMPEGVideoConverter(this._logger, this._fileManager, this._jobOptions.baseCommand, this._jobOptions.getInfoCommand);
