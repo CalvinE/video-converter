@@ -73,8 +73,8 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             duration: duration,
             durationPretty: millisecondsToHHMMSS(duration),
             statusCode: commandResult.exitCode ?? -999,
-            commandErrOutput: commandResult.success ? commandResult.fullStdErrOutput : undefined,
-            commandStdOutput: commandResult.success ? commandResult.fullOutput : undefined,
+            commandErrOutput: commandResult.success === true ? undefined : commandResult.fullStdErrOutput,
+            commandStdOutput: commandResult.success === true ? undefined : commandResult.fullOutput,
             results: [
                 {
                     command: this._ffmpegCommand,
@@ -142,8 +142,8 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             sourceFileFullPath: sourceFile.fullPath,
             success: commandResult.success,
             statusCode: commandResult.exitCode ?? -999,
-            commandErrOutput: commandResult.success ? commandResult.fullStdErrOutput : undefined,
-            commandStdOutput: commandResult.success ? commandResult.fullOutput : undefined,
+            commandErrOutput: commandResult.success === true ? undefined : commandResult.fullStdErrOutput,
+            commandStdOutput: commandResult.success === true ? undefined : commandResult.fullOutput,
             videoInfo,
         };
     }
@@ -182,8 +182,6 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                 convertedFileSize: targetFileInfo.size,
                 prettyConvertedFileSize: bytesToHumanReadableBytes(targetFileInfo.size),
                 statusCode: commandResult.exitCode ?? -999,
-                commandErrOutput: commandResult.success ? commandResult.fullStdErrOutput : undefined,
-                commandStdOutput: commandResult.success ? commandResult.fullOutput : undefined,
             }
         }
         return {
@@ -198,8 +196,8 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             convertedFileSize: 0,
             prettyConvertedFileSize: bytesToHumanReadableBytes(0),
             statusCode: commandResult.exitCode ?? -999,
-            commandErrOutput: commandResult.success ? commandResult.fullStdErrOutput : undefined,
-            commandStdOutput: commandResult.success ? commandResult.fullOutput : undefined,
+            commandErrOutput: commandResult.fullStdErrOutput,
+            commandStdOutput: commandResult.fullOutput,
         }
     }
 }
