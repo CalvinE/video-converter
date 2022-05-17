@@ -424,6 +424,7 @@ const FFPROBE_COMMAND = "ffprobe";
             const targetFileFullPath = getTargetFileFullPath(appLogger, fileInfo, appOptions).targetFileFullPath;
             const videoConvertOptions: VideoConvertOptions = {
                 commandID,
+                tryDeleteTargetFileIfIntegrityCheckFails: true, // TODO: make this configurable.
                 useCuda: appOptions.useCuda,
                 timeoutMilliseconds: CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS,
                 targetAudioEncoding: appOptions.targetAudioEncoder,

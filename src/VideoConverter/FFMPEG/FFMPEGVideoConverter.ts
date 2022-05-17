@@ -264,7 +264,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             xArgs: [],
         })
         if (sourceVideoIntegrityCheckResult.success === false) {
-            const durationMilliseconds = Date.now() - start
+            const durationMilliseconds = Date.now() - start;
             return {
                 commandID: options.commandID,
                 failureReason: "source file failed integrity get info call",
@@ -283,7 +283,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                 success: false,
             };
         } else if (sourceVideoIntegrityCheckResult.integrityCheck.isVideoGood === false) {
-            const durationMilliseconds = Date.now() - start
+            const durationMilliseconds = Date.now() - start;
             return {
                 commandID: options.commandID,
                 failureReason: "source file failed integrity check",
@@ -327,7 +327,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                 xArgs: [],
             });
             if (targetFileIntegrityCheckResult.success === false) {
-                const durationMilliseconds = Date.now() - start
+                const durationMilliseconds = Date.now() - start;
                 return {
                     commandID: options.commandID,
                     failureReason: "source file failed integrity get info call",
@@ -349,7 +349,12 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                     success: false,
                 };
             } else if (targetFileIntegrityCheckResult.integrityCheck.isVideoGood === false) {
-                const durationMilliseconds = Date.now() - start
+                const durationMilliseconds = Date.now() - start;
+                this._logger.LogError("target video file failed integrity check", new Error("target video file failed integrity check"), { targetFileIntegrityCheckResult });
+                if (options.tryDeleteTargetFileIfIntegrityCheckFails === true) {
+                    const didDelete = this._fileManager.safeUnlinkFile(targetFileInfo.fullPath);
+                    this._logger.LogWarn("attempting to delete converted file that failed the integrity check", { didDelete });
+                }
                 return {
                     commandID: options.commandID,
                     failureReason: "source file failed integrity check",
@@ -386,8 +391,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                 convertedFileSize: targetFileInfo.size,
                 prettyConvertedFileSize: bytesToHumanReadableBytes(targetFileInfo.size),
                 statusCode: commandResult.exitCode ?? -999,
-
-            }
+            };
         }
         return {
             commandID: options.commandID,
@@ -405,6 +409,6 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             statusCode: commandResult.exitCode ?? -999,
             commandErrOutput: commandResult.fullStdErrOutput,
             commandStdOutput: commandResult.fullOutput,
-        }
+        };
     }
 }

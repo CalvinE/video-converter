@@ -132,6 +132,7 @@ export type VideoConvertOptions = BaseVideoConverterOptions & {
   targetVideoEncoding: VideoEncoder;
   targetAudioEncoding: AudioEncoder;
   targetContainerFormat: VideoContainerFormat;
+  tryDeleteTargetFileIfIntegrityCheckFails: boolean;
 };
 
 export type BaseJobResult = {
