@@ -265,7 +265,8 @@ const FFPROBE_COMMAND = "ffprobe";
                     appLogger.LogWarn("job failed", {
                         job: jobOptions
                     });
-                    appOutputWriter.writeLine(`job failed: ${jobOptions.commandID} see logs for details`);
+                    appOutputWriter.writeLine(`job failed: ${jobOptions.commandID}`);
+                    appOutputWriter.writeLine(`reason: ${jobOptions.failureReason} - see logs for more details`);
                     appOutputWriter.writeLine(`run time: ${millisecondsToHHMMSS(durationMilliseconds)}`);
                 } else {
                     successfulJobs++;
