@@ -140,6 +140,7 @@ export type BaseJobResult = {
   durationPretty: string;
   success: boolean;
   statusCode: number;
+  failureReason?: string;
   commandStdOutput?: string[];
   commandErrOutput?: string[];
 }
@@ -160,8 +161,10 @@ export type GetVideoInfoResult = BaseJobResult & {
 export type ConvertVideoResult = BaseJobResult & {
   sourceFileInfo: FileInfo;
   sourceVideoInfo?: VideoInfo;
+  sourceFileIntegrityCheck: IntegrityCheckResult;
   targetFileInfo?: FileInfo;
-  targetVideoInfo?: VideoInfo
+  targetVideoInfo?: VideoInfo;
+  targetFileIntegrityCheck?: IntegrityCheckResult;
   convertedFileSize: number;
   prettyConvertedFileSize: string;
   sizeDifference: number;
@@ -177,11 +180,15 @@ export type VideoIntegrityIssues = {
   containerInfoMissing: boolean;
 }
 
+export type IntegrityCheckResult = {
+  isVideoGood: boolean;
+  issues?: VideoIntegrityIssues;
+};
+
 export type CheckVideoIntegrityResult = BaseJobResult & {
   fileInfo: FileInfo;
   videoInfo?: VideoInfo
-  isVideoGood: boolean;
-  issues?: VideoIntegrityIssues;
+  integrityCheck: IntegrityCheckResult
 };
 
 export type CopyResult = BaseJobResult & {
