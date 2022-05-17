@@ -1,14 +1,7 @@
 import {
     IFileManager
 } from './../../FileManager';
-import {
-    CommandCheckResult,
-    CommandStdErrMessageReceivedEventData,
-    GetVideoInfoOptions,
-    VideoConverterEventName_StdErrMessageReceived,
-    GetVideoInfoResult,
-    VideoInfo
-} from './../models';
+import { CheckVideoIntegrityOptions, VideoConvertOptions, VideoIntegrityIssues } from './../models';
 import {
     ILogger
 } from './../../Logger/Logger';
@@ -19,7 +12,13 @@ import {
     CommandRunner
 } from "../CommandRunner";
 import {
-    VideoConvertOptions,
+    CommandCheckResult,
+    CommandStdErrMessageReceivedEventData,
+    GetVideoInfoOptions,
+    VideoConverterEventName_StdErrMessageReceived,
+    GetVideoInfoResult,
+    VideoInfo,
+    CheckVideoIntegrityResult,
     IVideoConverter,
     CommandStartedEventData,
     CommandRunningEventData,
@@ -34,6 +33,8 @@ import {
     VideoConverterEventName_Errored,
     VideoConverterEventName_Timedout,
     ConvertVideoResult,
+    VideoStreamInfo,
+    AudioStreamInfo
 } from "../models";
 import {
     dirname
@@ -70,7 +71,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         return {
             commandID: checkCommandsCommandID,
             success: commandResult.success === true && ffprobeResult.success === true,
-            duration: duration,
+            durationMilliseconds: duration,
             durationPretty: millisecondsToHHMMSS(duration),
             statusCode: commandResult.exitCode ?? -999,
             commandErrOutput: commandResult.success === true ? undefined : commandResult.fullStdErrOutput,
@@ -118,6 +119,97 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this.emit(VideoConverterEventName_Timedout, data);
     }
 
+    public async checkVideoIntegrity(sourceFile: FileInfo, options: CheckVideoIntegrityOptions): Promise<CheckVideoIntegrityResult> {
+        const start = Date.now();
+        let isVideoGood = true;
+        const issues: VideoIntegrityIssues = {
+            audioStreamMissing: false,
+            containerInfoMissing: false,
+            getVideoInfoFailed: false,
+            isEmptyFile: false,
+            videoStreamIsRaw: false,
+            videoStreamMissing: false,
+        };
+        if (sourceFile.size === 0) {
+            const durationMilliseconds = Date.now() - start;
+            issues.isEmptyFile = true;
+            return {
+                commandID: options.commandID,
+                durationMilliseconds,
+                durationPretty: millisecondsToHHMMSS(durationMilliseconds),
+                statusCode: -999,
+                fileInfo: sourceFile,
+                isVideoGood: false,
+                success: true,
+                issues,
+            }
+        }
+        let videoInfo: VideoInfo | undefined = options.sourceVideoInfoOptions;
+
+        if (videoInfo === undefined) {
+            const getVideoInfoResult = await this.getVideoInfo(sourceFile, {
+                commandID: options.commandID,
+                timeoutMilliseconds: options.timeoutMilliseconds,
+                xArgs: [], // FIXME: need to be able to pass more options in for sub commands...
+            });
+            if (getVideoInfoResult.success === false) {
+                // this is an integrity check failure condition
+                issues.getVideoInfoFailed = true;
+                const durationMilliseconds = Date.now() - start;
+                return {
+                    commandID: options.commandID,
+                    durationMilliseconds,
+                    durationPretty: millisecondsToHHMMSS(durationMilliseconds),
+                    statusCode: -999,
+                    fileInfo: sourceFile,
+                    isVideoGood: false,
+                    success: true,
+                    issues,
+                }
+            }
+            videoInfo = getVideoInfoResult.videoInfo;
+        }
+
+        const videoStreamInfo = videoInfo.streams.find(s => s.codec_type === "video") as (VideoStreamInfo | undefined);
+        if (videoStreamInfo === undefined) {
+            issues.videoStreamMissing = true;
+            isVideoGood = false;
+        } else {
+            // do other video checks
+            if (videoStreamInfo.codec_name.toLowerCase() === "rawvideo") {
+                issues.videoStreamIsRaw = true;
+                isVideoGood = false;
+            }
+        }
+        const audioStreamInfo = videoInfo.streams.find(s => s.codec_type === "audio") as (AudioStreamInfo | undefined);
+        if (audioStreamInfo === undefined) {
+            issues.audioStreamMissing = true;
+            isVideoGood = false;
+        } else {
+            // do other audio checks?
+        }
+        const containerFormatInfo = videoInfo.format
+        if (containerFormatInfo === undefined) {
+            issues.containerInfoMissing = true;
+            isVideoGood = false;
+        } else {
+            // do other container checks?
+        }
+
+        const durationMilliseconds = Date.now() - start;
+        return {
+            commandID: options.commandID,
+            durationMilliseconds,
+            durationPretty: millisecondsToHHMMSS(durationMilliseconds),
+            isVideoGood,
+            issues,
+            fileInfo: sourceFile,
+            videoInfo: videoInfo,
+            statusCode: 0,
+            success: true,
+        }
+    }
+
     public async getVideoInfo(sourceFile: FileInfo, options: GetVideoInfoOptions): Promise<GetVideoInfoResult> {
         const args = [
             "-hide_banner",
@@ -136,10 +228,9 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this._logger.LogVerbose("video info retrieved", { videoInfo })
         return {
             commandID: options.commandID,
-            duration: commandResult.durationMilliseconds,
+            durationMilliseconds: commandResult.durationMilliseconds,
             durationPretty: millisecondsToHHMMSS(commandResult.durationMilliseconds),
-            size: sourceFile.size,
-            sourceFileFullPath: sourceFile.fullPath,
+            fileInfo: sourceFile,
             success: commandResult.success,
             statusCode: commandResult.exitCode ?? -999,
             commandErrOutput: commandResult.success === true ? undefined : commandResult.fullStdErrOutput,
@@ -172,10 +263,10 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             const sizeDiff = sourceFile.size - targetFileInfo.size;
             return {
                 commandID: options.commandID,
-                duration: commandResult.durationMilliseconds,
+                durationMilliseconds: commandResult.durationMilliseconds,
                 durationPretty: millisecondsToHHMMSS(commandResult.durationMilliseconds),
                 success: commandResult.success,
-                sourceFileFullPath: sourceFile.fullPath,
+                sourceFileInfo: sourceFile,
                 targetFileInfo,
                 sizeDifference: sizeDiff,
                 sizeDifferencePretty: bytesToHumanReadableBytes(sizeDiff),
@@ -186,10 +277,10 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         }
         return {
             commandID: options.commandID,
-            duration: commandResult.durationMilliseconds,
+            durationMilliseconds: commandResult.durationMilliseconds,
             durationPretty: millisecondsToHHMMSS(commandResult.durationMilliseconds),
             success: commandResult.success,
-            sourceFileFullPath: sourceFile.fullPath,
+            sourceFileInfo: sourceFile,
             // targetFileInfo: undefined,
             sizeDifference: 0,
             sizeDifferencePretty: bytesToHumanReadableBytes(0),

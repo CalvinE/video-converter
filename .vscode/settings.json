@@ -1,6 +1,7 @@
 {
     "editor.formatOnSave": true,
     "cSpell.words": [
+        "checkvideointegrity",
         "codepaths",
         "Cuda",
         "dahses",
@@ -11,6 +12,7 @@
         "hwaccel",
         "invalidfile",
         "libx",
+        "rawvideo",
         "sarg",
         "Timedout",
         "tsbuildinfo"

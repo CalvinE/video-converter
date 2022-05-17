@@ -9,7 +9,7 @@ import { AppOptions } from "../OptionsParser";
 export const COPY = "copy";
 export const INVALID = "invalid";
 
-export type SubCommand = "convert" | "getinfo" | `${typeof INVALID}`;
+export type SubCommand = "convert" | "getinfo" | "checkvideointegrity" | `${typeof INVALID}`;
 
 export type Task = SubCommand | `${typeof COPY}`;
 
@@ -47,7 +47,13 @@ export type CopyJobOptions = BaseJobOptions & {
   result?: CopyResult;
 };
 
-export type JobOptions = (ConvertJobOptions | GetInfoJobOptions | CopyJobOptions);
+export type CheckVideoIntegrityJobOptions = VideoCommandJobOptions & {
+  task: "checkvideointegrity";
+  options: CheckVideoIntegrityOptions;
+  result?: CheckVideoIntegrityResult;
+};
+
+export type JobOptions = (ConvertJobOptions | GetInfoJobOptions | CopyJobOptions | CheckVideoIntegrityJobOptions);
 
 // export type Job = CopyJobOptions | ConvertJobOptions | GetInfoJobOptions;
 
@@ -116,6 +122,10 @@ type BaseVideoConverterOptions = {
 
 export type GetVideoInfoOptions = BaseVideoConverterOptions;
 
+export type CheckVideoIntegrityOptions = BaseVideoConverterOptions & {
+  sourceVideoInfoOptions?: VideoInfo;
+};
+
 export type VideoConvertOptions = BaseVideoConverterOptions & {
   useCuda: boolean;
   targetFileFullPath: string;
@@ -126,7 +136,7 @@ export type VideoConvertOptions = BaseVideoConverterOptions & {
 
 export type BaseJobResult = {
   commandID: string;
-  duration: number;
+  durationMilliseconds: number;
   durationPretty: string;
   success: boolean;
   statusCode: number;
@@ -143,12 +153,12 @@ export type CommandCheckResult = BaseJobResult & {
 }
 
 export type GetVideoInfoResult = BaseJobResult & {
-  size: number;
   videoInfo: VideoInfo;
-  sourceFileFullPath: string;
+  fileInfo: FileInfo;
 }
 
 export type ConvertVideoResult = BaseJobResult & {
+  sourceFileInfo: FileInfo;
   sourceVideoInfo?: VideoInfo;
   targetFileInfo?: FileInfo;
   targetVideoInfo?: VideoInfo
@@ -156,10 +166,26 @@ export type ConvertVideoResult = BaseJobResult & {
   prettyConvertedFileSize: string;
   sizeDifference: number;
   sizeDifferencePretty: string;
-  sourceFileFullPath: string;
+};
+
+export type VideoIntegrityIssues = {
+  isEmptyFile: boolean;
+  getVideoInfoFailed: boolean;
+  videoStreamMissing: boolean;
+  audioStreamMissing: boolean;
+  videoStreamIsRaw: boolean;
+  containerInfoMissing: boolean;
+}
+
+export type CheckVideoIntegrityResult = BaseJobResult & {
+  fileInfo: FileInfo;
+  videoInfo?: VideoInfo
+  isVideoGood: boolean;
+  issues?: VideoIntegrityIssues;
 };
 
 export type CopyResult = BaseJobResult & {
+  sourceFileInfo: FileInfo;
   targetFileInfo?: FileInfo;
 };
 
@@ -199,6 +225,7 @@ export type CommandTimedoutEventData = BaseVideoConverterEvent & {
 export interface IVideoConverter {
   getVideoInfo: (sourceFile: FileInfo, options: GetVideoInfoOptions) => Promise<GetVideoInfoResult>;
   convertVideo: (sourceFile: FileInfo, options: VideoConvertOptions) => Promise<ConvertVideoResult>;
+  checkVideoIntegrity: (sourceFile: FileInfo, options: CheckVideoIntegrityOptions) => Promise<CheckVideoIntegrityResult>;
 }
 
 export function getVideoInfoCommandID(): string {

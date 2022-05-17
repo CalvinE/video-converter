@@ -22,7 +22,12 @@ import {
     JobOptions,
     ConvertVideoResult,
     GetVideoInfoResult,
-    CopyResult
+    CopyResult,
+    CheckVideoIntegrityResult,
+    CheckVideoIntegrityJobOptions,
+    CopyJobOptions,
+    ConvertJobOptions,
+    GetInfoJobOptions
 } from './VideoConverter/models';
 import {
     IOutputWriter
@@ -64,7 +69,7 @@ const FFPROBE_COMMAND = "ffprobe";
 
 /* 
     TODO: list
-    * refactor jobs to classes with constructor that takes job state. Have abstract base class that implements common functions.
+    * add better option for specifying additional options for a command?
     * allow a prefix / suffix to be added to converted files.
     * make a sweet CSI driven display for running jobs.
     * clean up output writer and logger output.
@@ -127,8 +132,11 @@ const FFPROBE_COMMAND = "ffprobe";
                 appLogger.LogDebug("convert flag found", {});
                 subCommand = "convert";
             } else if (appOptions.getInfo === true) {
-                appLogger.LogDebug("getinfo flag found", {});
+                appLogger.LogDebug("getInfo flag found", {});
                 subCommand = "getinfo";
+            } else if (appOptions.checkVideoIntegrity === true) {
+                appLogger.LogDebug("checkVideoIntegrity flag found", {});
+                subCommand = "checkvideointegrity";
             }
             appLogger.LogInfo("enumerating source path", { sourcePath: appOptions.sourcePath });
             appOutputWriter.writeLine(`enumerating directory: ${appOptions.sourcePath}`);
@@ -218,27 +226,34 @@ const FFPROBE_COMMAND = "ffprobe";
                 const result = await job.execute();
                 if (jobOptions.task === "convert") {
                     jobOptions.result = result as ConvertVideoResult;
-                    durationMilliseconds = result.duration;
+                    durationMilliseconds = result.durationMilliseconds;
                     totalSizeReduction += jobOptions.result.sizeDifference;
                     sizeBytesReduction = jobOptions.result.sizeDifference;
-                    sourceFile = jobOptions.result.sourceFileFullPath;
+                    sourceFile = jobOptions.result.sourceFileInfo.fullPath;
                     targetFile = jobOptions.result.targetFileInfo?.fullPath ?? "";
                     jobOptions.state = "completed";
                     success = result.success;
                 } else if (jobOptions.task === "getinfo") {
                     jobOptions.result = result as GetVideoInfoResult;
-                    durationMilliseconds = result.duration;
-                    sourceFile = jobOptions.result.sourceFileFullPath;
+                    durationMilliseconds = result.durationMilliseconds;
+                    sourceFile = jobOptions.result.fileInfo.fullPath;
                     jobOptions.state = "completed";
                     success = result.success
                 } else if (jobOptions.task === "copy") {
                     jobOptions.result = result as CopyResult;
-                    durationMilliseconds = result.duration;
-                    sourceFile = jobOptions.fileInfo.fullPath;
+                    durationMilliseconds = result.durationMilliseconds;
+                    sourceFile = jobOptions.result.sourceFileInfo.fullPath;
                     targetFile = jobOptions.result.targetFileInfo?.fullPath ?? "";
                     jobOptions.state = "completed";
                     success = result.success;
-                } else {
+                } else if (jobOptions.task === "checkvideointegrity") {
+                    jobOptions.result = result as CheckVideoIntegrityResult;
+                    durationMilliseconds = result.durationMilliseconds;
+                    sourceFile = jobOptions.result.fileInfo.fullPath;
+                    jobOptions.state = "completed";
+                    success = result.success
+                }
+                else {
                     /// We should not be allowed to get here...
                     appLogger.LogWarn("job with invalid task encountered...", jobOptions);
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -425,7 +440,7 @@ const FFPROBE_COMMAND = "ffprobe";
                 state: "pending",
                 task: "convert",
                 options: videoConvertOptions,
-            };
+            } as ConvertJobOptions;
         } else if (task === "getinfo") {
             const getVideoInfoOptions: GetVideoInfoOptions = {
                 commandID,
@@ -440,7 +455,7 @@ const FFPROBE_COMMAND = "ffprobe";
                 state: "pending",
                 task: "getinfo",
                 options: getVideoInfoOptions,
-            };
+            } as GetInfoJobOptions;
         } else if (task === "copy") {
             const targetFileFullPath = getTargetFileFullPath(appLogger, fileInfo, appOptions).targetFileFullPath;
             return {
@@ -450,7 +465,21 @@ const FFPROBE_COMMAND = "ffprobe";
                 state: "pending",
                 task: "copy",
                 targetFileFullPath,
-            }
+            } as CopyJobOptions;
+        } else if (task === "checkvideointegrity") {
+            return {
+                baseCommand: FFPROBE_COMMAND,
+                commandID,
+                fileInfo,
+                host: "local",
+                state: "pending",
+                task: "checkvideointegrity",
+                options: {
+                    commandID,
+                    timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
+                    xArgs: [],
+                }
+            } as CheckVideoIntegrityJobOptions;
         }
         const error = new Error(`invalid task type encountered: ${task}`)
         logger.LogError("invalid task type provided", error, {

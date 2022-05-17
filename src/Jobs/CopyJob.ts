@@ -31,8 +31,9 @@ export class CopyJob extends BaseJob<CopyJobOptions, CopyResult> {
             const duration = end - start;
             resolve({
                 commandID: this._jobOptions.commandID,
-                duration,
+                durationMilliseconds: duration,
                 durationPretty: millisecondsToHHMMSS(duration),
+                sourceFileInfo: this._jobOptions.fileInfo,
                 statusCode,
                 success,
                 targetFileInfo,

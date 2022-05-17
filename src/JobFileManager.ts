@@ -92,10 +92,10 @@ export class JobFileManager implements IJobFileManager {
             if (job.task === "convert") {
                 this._jobFileData.totalSizeChangeBytes += job.result?.sizeDifference ?? 0;
                 this._jobFileData.prettyTotalSizeChange = bytesToHumanReadableBytes(this._jobFileData.totalSizeChangeBytes);
-                this._jobFileData.durationMilliseconds += job.result?.duration ?? 0;
+                this._jobFileData.durationMilliseconds += job.result?.durationMilliseconds ?? 0;
                 this._jobFileData.prettyDuration = millisecondsToHHMMSS(this._jobFileData.durationMilliseconds);
             } else if (job.task === "getinfo") {
-                this._jobFileData.durationMilliseconds += job.result?.duration ?? 0;
+                this._jobFileData.durationMilliseconds += job.result?.durationMilliseconds ?? 0;
                 this._jobFileData.prettyDuration = millisecondsToHHMMSS(this._jobFileData.durationMilliseconds);
             } // FIXME: copy does not have a duration... need to fix that
         }

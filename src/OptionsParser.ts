@@ -21,6 +21,7 @@ const COPY_RELATIVE_FOLDER_PATHS = "copyRelativeFolderPath";
 const SAVE_IN_PLACE = "saveInPlace";
 const GET_INFO_OPTION_NAME = "getInfo";
 const CONVERT_VIDEO_OPTION_NAME = "convertVideo";
+const CHECK_VIDEO_INTEGRITY_OPTION_NAME = "checkVideoIntegrity"
 const SAVE_JOB_FILE_ONLY_OPTION_NAME = "saveJobFileOnly";
 const JOB_FILE_PATH_OPTION_NAME = "jobFile";
 const CONCURRENT_JOBS_OPTION_NAME = "concurrentJobs";
@@ -42,6 +43,7 @@ export type AppOptions = {
     [SAVE_IN_PLACE]: boolean;
     [GET_INFO_OPTION_NAME]: boolean;
     [CONVERT_VIDEO_OPTION_NAME]: boolean;
+    [CHECK_VIDEO_INTEGRITY_OPTION_NAME]: boolean;
     [SAVE_JOB_FILE_ONLY_OPTION_NAME]: boolean;
     [JOB_FILE_PATH_OPTION_NAME]: string;
     [CONCURRENT_JOBS_OPTION_NAME]: number;
@@ -73,6 +75,7 @@ export function ParseOptions(): AppOptions {
         copyRelativeFolderPath: false,
         getInfo: false,
         convertVideo: false,
+        checkVideoIntegrity: false,
         saveJobFileOnly: false,
         jobFile: join(".", "output", "jobs", `${dateToFileSafeDate(new Date())}-video-converter-job.json`),
         concurrentJobs: 1,
@@ -176,6 +179,9 @@ export function ParseOptions(): AppOptions {
             case CONVERT_VIDEO_OPTION_NAME:
                 options[CONVERT_VIDEO_OPTION_NAME] = true;
                 break;
+            case CHECK_VIDEO_INTEGRITY_OPTION_NAME:
+                options[CHECK_VIDEO_INTEGRITY_OPTION_NAME] = true;
+                break;
             case SAVE_JOB_FILE_ONLY_OPTION_NAME:
                 options[SAVE_JOB_FILE_ONLY_OPTION_NAME] = true;
                 break;
@@ -267,6 +273,10 @@ export function PrintHelp() {
             {
                 name: CONVERT_VIDEO_OPTION_NAME,
                 description: "A flag. When present will convert video files based on options provided.",
+            },
+            {
+                name: CHECK_VIDEO_INTEGRITY_OPTION_NAME,
+                description: "A flag. When present will perform a integrity check of the video files that match other parameters listed.",
             },
             {
                 name: SAVE_JOB_FILE_ONLY_OPTION_NAME,
