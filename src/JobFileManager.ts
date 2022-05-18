@@ -97,6 +97,12 @@ export class JobFileManager implements IJobFileManager {
             } else if (job.task === "getinfo") {
                 this._jobFileData.durationMilliseconds += job.result?.durationMilliseconds ?? 0;
                 this._jobFileData.prettyDuration = millisecondsToHHMMSS(this._jobFileData.durationMilliseconds);
+            } else if (job.task === "checkvideointegrity") {
+                this._jobFileData.durationMilliseconds += job.result?.durationMilliseconds ?? 0;
+                this._jobFileData.prettyDuration = millisecondsToHHMMSS(this._jobFileData.durationMilliseconds);
+            } else if (job.task === "copy") {
+                this._jobFileData.durationMilliseconds += job.result?.durationMilliseconds ?? 0;
+                this._jobFileData.prettyDuration = millisecondsToHHMMSS(this._jobFileData.durationMilliseconds);
             } // FIXME: copy does not have a duration... need to fix that
         }
         if (job.state == 'completed' || job.state == 'error') {

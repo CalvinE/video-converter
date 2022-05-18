@@ -275,7 +275,7 @@ const FFPROBE_COMMAND = "ffprobe";
                 } else {
                     successfulJobs++;
                     appLogger.LogInfo("job successful", { job: jobOptions });
-                    appOutputWriter.writeLine(`job ${jobOptions.jobID} finished`);
+                    appOutputWriter.writeLine(`job finished: ${jobOptions.jobID}`);
                     appOutputWriter.writeLine(`run time: ${millisecondsToHHMMSS(durationMilliseconds)}`);
                     if (sizeBytesReduction !== 0) {
                         appOutputWriter.writeLine(`file size reduced by ${bytesToHumanReadableBytes(sizeBytesReduction)}`);
