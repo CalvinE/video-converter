@@ -17,7 +17,6 @@ import {
     VideoConvertCommandOptions,
     GetVideoInfoCommandOptions,
     Task,
-    getCommandID,
     SubCommand,
     INVALID,
     JobsOptionsArray,
@@ -434,26 +433,24 @@ const FFPROBE_COMMAND = "ffprobe";
     }
 
     function makeJob(logger: ILogger, task: Task, fileInfo: FileInfo, appOptions: AppOptions): JobOptions {
-        const commandID = getCommandID(task);
         logger.LogVerbose(`making job of type ${task}`, { fileInfo, appOptions, task });
         if (task === "convert") {
             const targetFileFullPath = getTargetFileFullPath(appLogger, fileInfo, appOptions).targetFileFullPath;
             const jobID = getJobID(CONVERT_VIDEO_JOB_NAME);
             const videoConvertOptions: VideoConvertCommandOptions = {
-                tryDeleteTargetFileIfIntegrityCheckFails: true, // TODO: make this configurable.
                 useCuda: appOptions.useCuda,
                 timeoutMilliseconds: CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS,
                 targetAudioEncoding: appOptions.targetAudioEncoder,
                 targetVideoEncoding: appOptions.targetVideoEncoder,
                 targetContainerFormat: appOptions.targetContainerFormat,
                 targetFileFullPath: targetFileFullPath,
-                keepInvalidConvertResult: appOptions.keepInvalidConvertResult,
                 xArgs: appOptions.xArgs,
             };
             return {
                 baseCommand: FFMPEG_COMMAND,
                 getInfoCommand: FFPROBE_COMMAND,
                 jobID,
+                keepInvalidConvertResult: appOptions.keepInvalidConvertResult,
                 fileInfo,
                 host: "local",
                 state: "pending",
@@ -492,13 +489,12 @@ const FFPROBE_COMMAND = "ffprobe";
                 baseCommand: FFPROBE_COMMAND,
                 jobID,
                 fileInfo,
+                deleteFailedIntegrityCheckFiles: appOptions.deleteFailedIntegrityCheckFiles,
                 host: "local",
                 state: "pending",
                 task: "checkvideointegrity",
                 commandOptions: {
-                    commandID: commandID,
                     timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-                    deleteFailedIntegrityCheckFiles: appOptions.deleteFailedIntegrityCheckFiles,
                     xArgs: [],
                 }
             } as CheckVideoIntegrityJobOptions;

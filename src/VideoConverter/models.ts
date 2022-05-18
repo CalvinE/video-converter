@@ -88,6 +88,7 @@ export type ConvertJobOptions = VideoCommandJobOptions & {
   task: "convert";
   getInfoCommand: string;
   commandOptions: VideoConvertCommandOptions;
+  keepInvalidConvertResult: boolean;
   result?: ConvertVideoJobResult;
 }
 
@@ -105,6 +106,7 @@ export type CopyJobOptions = BaseJobOptions & {
 
 export type CheckVideoIntegrityJobOptions = VideoCommandJobOptions & {
   task: "checkvideointegrity";
+  deleteFailedIntegrityCheckFiles: boolean;
   commandOptions: CheckVideoIntegrityCommandOptions;
   result?: CheckVideoIntegrityJobResult;
 };
@@ -177,7 +179,6 @@ export type GetVideoInfoCommandOptions = BaseVideoConverterOptions;
 
 export type CheckVideoIntegrityCommandOptions = BaseVideoConverterOptions & {
   sourceVideoInfoOptions?: VideoInfo;
-  deleteFailedIntegrityCheckFiles: boolean;
 };
 
 export type VideoConvertCommandOptions = BaseVideoConverterOptions & {
@@ -186,8 +187,6 @@ export type VideoConvertCommandOptions = BaseVideoConverterOptions & {
   targetVideoEncoding: VideoEncoder;
   targetAudioEncoding: AudioEncoder;
   targetContainerFormat: VideoContainerFormat;
-  tryDeleteTargetFileIfIntegrityCheckFails: boolean;
-  keepInvalidConvertResult: boolean;
 };
 
 // Command results

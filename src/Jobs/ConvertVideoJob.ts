@@ -42,7 +42,6 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
         const getSourceInfoFFMPEGCommand = new FFMPEGVideoConverter(this._logger, this._fileManager, this._jobOptions.baseCommand, this._jobOptions.getInfoCommand);
         const sourceCheckVideoIntegrityCommandResult = await getSourceInfoFFMPEGCommand.checkVideoIntegrity(this._jobOptions.fileInfo, this._jobOptions.jobID, sourceIntegrityCheckCommandID, {
             timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-            deleteFailedIntegrityCheckFiles: false,
             xArgs: [],
         })
         if (sourceCheckVideoIntegrityCommandResult.success === false) {
@@ -73,7 +72,6 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
             const targetIntegrityCheckCommandID = getCommandID("checkvideointegrity");
             targetCheckVideoIntegrityResult = await targetFileVideoInfoCommand.checkVideoIntegrity(targetFileInfo, this._jobOptions.jobID, targetIntegrityCheckCommandID, {
                 timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-                deleteFailedIntegrityCheckFiles: false,
                 xArgs: [],
             });
             targetVideoInfo = targetCheckVideoIntegrityResult.videoInfo;
@@ -83,7 +81,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
                 const msg = "failed to perform video integrity check converted file";
                 this._logger.LogWarn(msg, { targetFileFullPath: this._jobOptions.commandOptions.targetFileFullPath });
                 this._outputWriter.writeLine(msg);
-            } else if (targetCheckVideoIntegrityResult.integrityCheck.isVideoGood === false && this._jobOptions.commandOptions.keepInvalidConvertResult === false) {
+            } else if (targetCheckVideoIntegrityResult.integrityCheck.isVideoGood === false && this._jobOptions.keepInvalidConvertResult === false) {
                 const msg = "resulting file failed integrity check. deleting converted file per keepInvalidConvertResult being set to false";
                 this._logger.LogWarn(msg, {
                     invalidConvertedFile: targetFileInfo.fullPath,
