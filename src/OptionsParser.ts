@@ -25,6 +25,8 @@ const CHECK_VIDEO_INTEGRITY_OPTION_NAME = "checkVideoIntegrity"
 const SAVE_JOB_FILE_ONLY_OPTION_NAME = "saveJobFileOnly";
 const JOB_FILE_PATH_OPTION_NAME = "jobFile";
 const CONCURRENT_JOBS_OPTION_NAME = "concurrentJobs";
+const KEEP_FAILED_INTEGRITY_CONVERTED = "keepInvalidConvertResult";
+const DELETE_FAILED_INTEGRITY_CHECK_FILES = "deleteFailedIntegrityCheckFiles";
 const X_ARGS_OPTION_NAME = "xArgs"
 const HELP_OPTION_NAME = "help";
 
@@ -47,6 +49,8 @@ export type AppOptions = {
     [SAVE_JOB_FILE_ONLY_OPTION_NAME]: boolean;
     [JOB_FILE_PATH_OPTION_NAME]: string;
     [CONCURRENT_JOBS_OPTION_NAME]: number;
+    [KEEP_FAILED_INTEGRITY_CONVERTED]: boolean;
+    [DELETE_FAILED_INTEGRITY_CHECK_FILES]: boolean;
     [X_ARGS_OPTION_NAME]: string[];
     [HELP_OPTION_NAME]: boolean;
 }
@@ -79,6 +83,8 @@ export function ParseOptions(): AppOptions {
         saveJobFileOnly: false,
         jobFile: join(".", "output", "jobs", `${dateToFileSafeDate(new Date())}-video-converter-job.json`),
         concurrentJobs: 1,
+        keepInvalidConvertResult: false,
+        deleteFailedIntegrityCheckFiles: false,
         xArgs: [],
         help: false,
     };
@@ -188,6 +194,12 @@ export function ParseOptions(): AppOptions {
             case JOB_FILE_PATH_OPTION_NAME:
                 options[JOB_FILE_PATH_OPTION_NAME] = argv[++i];
                 break;
+            case KEEP_FAILED_INTEGRITY_CONVERTED:
+                options[KEEP_FAILED_INTEGRITY_CONVERTED] = true;
+                break;
+            case DELETE_FAILED_INTEGRITY_CHECK_FILES:
+                options[DELETE_FAILED_INTEGRITY_CHECK_FILES] = true;
+                break;
             case CONCURRENT_JOBS_OPTION_NAME:
                 // eslint-disable-next-line no-case-declarations
                 const concurrentJobsString = argv[++i];
@@ -285,6 +297,14 @@ export function PrintHelp() {
             {
                 name: JOB_FILE_PATH_OPTION_NAME,
                 description: `A path to a json job file. if none is provided a default will be generated. If the file provided does not exist it will be created and populated based on the other options provided.`,
+            },
+            {
+                name: KEEP_FAILED_INTEGRITY_CONVERTED,
+                description: `A flag. When present in a convert job it will keep converted files that fail the video integrity check. By default they are deleted.`,
+            },
+            {
+                name: DELETE_FAILED_INTEGRITY_CHECK_FILES,
+                description: `A flag. When present in a check integrity job it will delete files that fail the video integrity check. By default they are not deleted.`,
             },
             {
                 name: CONCURRENT_JOBS_OPTION_NAME,

@@ -1,11 +1,11 @@
 import { FileInfo, IFileManager } from './../FileManager';
-import { BaseJobOptions, BaseJobResult } from './../VideoConverter/models';
+import { BaseJobOptions, BaseCommandResult, BaseJobResult } from './../VideoConverter/models';
 import { IOutputWriter } from './../OutputWriter';
 import { ILogger } from "../Logger";
 
 export interface IJob {
     // new(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, jobOptions: BaseJobOptions): BaseJob<BaseJobOptions, BaseJobResult>;
-    execute(): Promise<BaseJobResult>;
+    execute(): Promise<BaseCommandResult>;
 }
 
 /**
@@ -24,8 +24,6 @@ export abstract class BaseJob<O extends BaseJobOptions, R extends BaseJobResult>
     public success: boolean;
     public durationMilliseconds: number;
     public sizeBytesChange: number;
-    public sourceFile: FileInfo;
-    public targetFile?: FileInfo;
 
     constructor(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, jobOptions: O) {
         this._logger = logger;
@@ -35,10 +33,11 @@ export abstract class BaseJob<O extends BaseJobOptions, R extends BaseJobResult>
         this.success = false;
         this.durationMilliseconds = 0;
         this.sizeBytesChange = 0;
-        this.sourceFile = jobOptions.fileInfo;
     }
 
     public abstract validateJobOptions(): boolean
+
+    public abstract getJobTypeName(): string;
 
     protected abstract _execute(): Promise<R>;
 

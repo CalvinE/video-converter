@@ -113,7 +113,7 @@ export class JobFileManager implements IJobFileManager {
                         sizeAfterProcessing += j.fileInfo.size;
                     }
                 } else if (j.state === "error") {
-                    failedJobIds.push(j.commandID);
+                    failedJobIds.push(j.jobID);
                     failedCount++;
                     sizeAfterProcessing += j.fileInfo.size;
                 } else {
@@ -131,8 +131,8 @@ export class JobFileManager implements IJobFileManager {
     }
 
     public updateJob(job: JobOptions): void {
-        this._logger.LogInfo("updating job file data for job", { commandID: job.commandID });
-        const jobIndex = this._jobFileData.jobs.findIndex((j) => j.commandID === job.commandID);
+        this._logger.LogInfo("updating job file data for job", { jobID: job.jobID });
+        const jobIndex = this._jobFileData.jobs.findIndex((j) => j.jobID === job.jobID);
         if (jobIndex >= 0) {
             this._logger.LogVerbose("updating job", { job, jobIndex })
             this._jobFileData.jobs[jobIndex] = job;

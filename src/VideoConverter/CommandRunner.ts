@@ -31,7 +31,7 @@ import {
 } from './models';
 
 export type CommandResult = {
-    commandId: string,
+    commandID: string,
     durationMilliseconds: number;
     durationPretty: string;
     error?: Error;
@@ -74,7 +74,7 @@ export abstract class CommandRunner extends EventEmitter {
     protected abstract emitErrored(data: CommandErroredEventData): void;
     protected abstract emitTimedout(data: CommandTimedoutEventData): void;
 
-    protected async executeCommand(command: string, args: string[], commandId: string, timeoutMilliseconds: number): Promise<CommandResult> {
+    protected async executeCommand(command: string, args: string[], jobID: string, commandID: string, timeoutMilliseconds: number): Promise<CommandResult> {
         return new Promise((resolve) => {
             let currentState: CommandState;
             let timeoutTimer: NodeJS.Timeout;
@@ -83,7 +83,7 @@ export abstract class CommandRunner extends EventEmitter {
             const startTimestampMilliseconds = Date.now();
             this._logger.LogVerbose("about to run command", {
                 command: command,
-                commandId: commandId,
+                commandID,
                 args,
             })
             const proc = spawn(command, args, {
@@ -91,7 +91,8 @@ export abstract class CommandRunner extends EventEmitter {
             });
             currentState = CommandStateName_Started;
             const eventData = {
-                commandId,
+                commandID,
+                jobID,
                 currentState,
                 elapsedTimeMilliseconds: this.getElapsedTimeMilliseconds(startTimestampMilliseconds),
                 elapsedTimePretty: millisecondsToHHMMSS(this.getElapsedTimeMilliseconds(startTimestampMilliseconds)),
@@ -105,7 +106,8 @@ export abstract class CommandRunner extends EventEmitter {
                 currentState = CommandStateName_Running;
                 const elapsedTimeMilliseconds = this.getElapsedTimeMilliseconds(startTimestampMilliseconds);
                 const eventData = {
-                    commandId,
+                    commandID,
+                    jobID,
                     currentState,
                     elapsedTimeMilliseconds,
                     elapsedTimePretty: millisecondsToHHMMSS(elapsedTimeMilliseconds),
@@ -122,7 +124,8 @@ export abstract class CommandRunner extends EventEmitter {
                 commandStdErrOutput.push(currentMessage);
                 const elapsedTimeMilliseconds = this.getElapsedTimeMilliseconds(startTimestampMilliseconds);
                 const eventData: CommandStdErrMessageReceivedEventData = {
-                    commandId,
+                    commandID: commandID,
+                    jobID: jobID,
                     commandMessage: currentMessage,
                     currentState,
                     elapsedTimeMilliseconds,
@@ -138,7 +141,8 @@ export abstract class CommandRunner extends EventEmitter {
                 commandOutput.push(currentMessage);
                 const elapsedTimeMilliseconds = this.getElapsedTimeMilliseconds(startTimestampMilliseconds);
                 const eventData: CommandStdOutMessageReceivedEventData = {
-                    commandId,
+                    commandID: commandID,
+                    jobID: jobID,
                     commandMessage: currentMessage,
                     currentState,
                     elapsedTimeMilliseconds,
@@ -169,7 +173,8 @@ export abstract class CommandRunner extends EventEmitter {
                 const durationMilliseconds = this.getElapsedTimeMilliseconds(startTimestampMilliseconds);
                 currentState = CommandStateName_Errored;
                 const eventData: CommandErroredEventData = {
-                    commandId,
+                    commandID: commandID,
+                    jobID: jobID,
                     currentState,
                     elapsedTimeMilliseconds: durationMilliseconds,
                     elapsedTimePretty: millisecondsToHHMMSS(durationMilliseconds),
@@ -179,7 +184,7 @@ export abstract class CommandRunner extends EventEmitter {
                 this._logger.LogError("command encountered an error", err, eventData)
                 this.emitErrored(eventData);
                 resolve({
-                    commandId,
+                    commandID,
                     durationMilliseconds,
                     durationPretty: millisecondsToHHMMSS(durationMilliseconds),
                     fullOutput: commandOutput,
@@ -197,7 +202,8 @@ export abstract class CommandRunner extends EventEmitter {
                     currentState = CommandStateName_Finished;
                     const eventData: CommandFinishedEventData = {
                         code: currentCode,
-                        commandId,
+                        commandID: commandID,
+                        jobID: jobID,
                         currentState,
                         elapsedTimeMilliseconds: durationMilliseconds,
                         elapsedTimePretty: millisecondsToHHMMSS(durationMilliseconds),
@@ -207,7 +213,7 @@ export abstract class CommandRunner extends EventEmitter {
                     this._logger.LogDebug("command closed", eventData);
                     this.emitFinished(eventData);
                     resolve({
-                        commandId,
+                        commandID,
                         durationMilliseconds,
                         durationPretty: millisecondsToHHMMSS(durationMilliseconds),
                         fullOutput: commandOutput,
@@ -269,7 +275,8 @@ export abstract class CommandRunner extends EventEmitter {
                         const durationMilliseconds = this.getElapsedTimeMilliseconds(startTimestampMilliseconds);
                         currentState = CommandStateName_TimedOut;
                         const eventData = {
-                            commandId,
+                            commandID,
+                            jobID,
                             currentState,
                             elapsedTimeMilliseconds: durationMilliseconds,
                             elapsedTimePretty: millisecondsToHHMMSS(durationMilliseconds),
@@ -280,7 +287,7 @@ export abstract class CommandRunner extends EventEmitter {
                         this._logger.LogError("command timed out", err, eventData);
                         this.emitTimedout(eventData);
                         resolve({
-                            commandId,
+                            commandID,
                             durationMilliseconds,
                             durationPretty: millisecondsToHHMMSS(durationMilliseconds),
                             error: err,

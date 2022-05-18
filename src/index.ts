@@ -1,3 +1,7 @@
+import { CHECK_VIDEO_INTEGRITY_JOB_NAME } from './Jobs/CheckVideoIntegrityJob';
+import { COPY_JOB_NAME } from './Jobs/CopyJob';
+import { GET_VIDEO_INFO_JOB_NAME } from './Jobs/GetVideoInfoJob';
+import { CONVERT_VIDEO_JOB_NAME } from './Jobs/ConvertVideoJob';
 import { JobFactory } from './Jobs/JobFactory';
 import {
     IJobFileManager,
@@ -10,24 +14,25 @@ import {
     resolve
 } from 'path';
 import {
-    VideoConvertOptions,
-    GetVideoInfoOptions,
+    VideoConvertCommandOptions,
+    GetVideoInfoCommandOptions,
     Task,
-    getJobCommandID,
+    getCommandID,
     SubCommand,
     INVALID,
     JobsOptionsArray,
     getJobID,
     JobFile,
     JobOptions,
-    ConvertVideoResult,
-    GetVideoInfoResult,
-    CopyResult,
-    CheckVideoIntegrityResult,
+    CopyJobResult,
     CheckVideoIntegrityJobOptions,
     CopyJobOptions,
     ConvertJobOptions,
-    GetInfoJobOptions
+    GetInfoJobOptions,
+    ConvertVideoJobResult,
+    GetVideoInfoJobResult,
+    CheckVideoIntegrityJobResult,
+    getJobFileID
 } from './VideoConverter/models';
 import {
     IOutputWriter
@@ -149,7 +154,7 @@ const FFPROBE_COMMAND = "ffprobe";
                 // The order of these fields is important.
                 // The order here is the order they will appear in the file.
                 // So ordering these well will make it easier to read in a text editor.
-                jobID: getJobID(),
+                jobFileID: getJobFileID(),
                 jobName: jobName,
                 percentDone: 0,
                 percentSizeChange: 0,
@@ -194,9 +199,9 @@ const FFPROBE_COMMAND = "ffprobe";
         let failedJobs = 0; let i = 0;
         for (const jobOptions of jobFileData.jobs) {
             i++;
-            appLogger.LogInfo("starting job", { commandID: jobOptions.commandID });
+            appLogger.LogInfo("starting job", { jobID: jobOptions.jobID });
             appOutputWriter.writeLine("");
-            appOutputWriter.writeLine(`starting job ${i} of ${numJobs} ${jobOptions.commandID} - ${jobOptions.task}`);
+            appOutputWriter.writeLine(`starting job ${i} of ${numJobs} ${jobOptions.jobID} - ${jobOptions.task}`);
             if (jobOptions.state === "running" || jobOptions.state === "error") {
                 // a job was started, so we need to clean up the what files may have been created
                 appLogger.LogInfo(`job was interrupted or encountered an error attempting to restart job`, { job: jobOptions });
@@ -206,9 +211,9 @@ const FFPROBE_COMMAND = "ffprobe";
                 jobFileManager.updateJob(jobOptions);
             } else if (jobOptions.state === "completed") {
                 // skip the job its already done...
-                appLogger.LogInfo("job is already completed... skipping...", { commandID: jobOptions.commandID, task: jobOptions.task, sourceFile: jobOptions.fileInfo.fullPath });
+                appLogger.LogInfo("job is already completed... skipping...", { jobID: jobOptions.jobID, task: jobOptions.task, sourceFile: jobOptions.fileInfo.fullPath });
                 appLogger.LogVerbose("previously completed job data", { job: jobOptions });
-                appOutputWriter.writeLine(`previously completed job ${jobOptions.commandID}... see logs for details.`);
+                appOutputWriter.writeLine(`previously completed job ${jobOptions.jobID}... see logs for details.`);
                 continue;
             }
             // pending is the only other state?
@@ -225,7 +230,7 @@ const FFPROBE_COMMAND = "ffprobe";
                 const job = JobFactory.MakeJob(appLogger, appOutputWriter, fileManager, jobOptions);
                 const result = await job.execute();
                 if (jobOptions.task === "convert") {
-                    jobOptions.result = result as ConvertVideoResult;
+                    jobOptions.result = result as ConvertVideoJobResult;
                     durationMilliseconds = result.durationMilliseconds;
                     totalSizeReduction += jobOptions.result.sizeDifference;
                     sizeBytesReduction = jobOptions.result.sizeDifference;
@@ -234,22 +239,22 @@ const FFPROBE_COMMAND = "ffprobe";
                     jobOptions.state = "completed";
                     success = result.success;
                 } else if (jobOptions.task === "getinfo") {
-                    jobOptions.result = result as GetVideoInfoResult;
+                    jobOptions.result = result as GetVideoInfoJobResult;
                     durationMilliseconds = result.durationMilliseconds;
-                    sourceFile = jobOptions.result.fileInfo.fullPath;
+                    sourceFile = jobOptions.result.fileInfo?.fullPath ?? "";
                     jobOptions.state = "completed";
                     success = result.success
                 } else if (jobOptions.task === "copy") {
-                    jobOptions.result = result as CopyResult;
+                    jobOptions.result = result as CopyJobResult;
                     durationMilliseconds = result.durationMilliseconds;
                     sourceFile = jobOptions.result.sourceFileInfo.fullPath;
                     targetFile = jobOptions.result.targetFileInfo?.fullPath ?? "";
                     jobOptions.state = "completed";
                     success = result.success;
                 } else if (jobOptions.task === "checkvideointegrity") {
-                    jobOptions.result = result as CheckVideoIntegrityResult;
+                    jobOptions.result = result as CheckVideoIntegrityJobResult;
                     durationMilliseconds = result.durationMilliseconds;
-                    sourceFile = jobOptions.result.fileInfo.fullPath;
+                    sourceFile = jobOptions.result?.fileInfo?.fullPath ?? "";
                     jobOptions.state = "completed";
                     success = result.success
                 }
@@ -265,13 +270,13 @@ const FFPROBE_COMMAND = "ffprobe";
                     appLogger.LogWarn("job failed", {
                         job: jobOptions
                     });
-                    appOutputWriter.writeLine(`job failed: ${jobOptions.commandID}`);
+                    appOutputWriter.writeLine(`job failed: ${jobOptions.jobID}`);
                     appOutputWriter.writeLine(`reason: ${jobOptions.failureReason} - see logs for more details`);
                     appOutputWriter.writeLine(`run time: ${millisecondsToHHMMSS(durationMilliseconds)}`);
                 } else {
                     successfulJobs++;
                     appLogger.LogInfo("job successful", { job: jobOptions });
-                    appOutputWriter.writeLine(`job ${jobOptions.commandID} finished`);
+                    appOutputWriter.writeLine(`job ${jobOptions.jobID} finished`);
                     appOutputWriter.writeLine(`run time: ${millisecondsToHHMMSS(durationMilliseconds)}`);
                     if (sizeBytesReduction !== 0) {
                         appOutputWriter.writeLine(`file size reduced by ${bytesToHumanReadableBytes(sizeBytesReduction)}`);
@@ -288,7 +293,7 @@ const FFPROBE_COMMAND = "ffprobe";
                 jobOptions.state = "error";
                 jobOptions.failureReason = `${err}`;
                 appLogger.LogError("job processing failed", err as Error, { job: jobOptions });
-                appOutputWriter.writeLine(`an error occurred while processing job ${jobOptions.commandID}`);
+                appOutputWriter.writeLine(`an error occurred while processing job ${jobOptions.jobID}`);
                 appOutputWriter.writeLine(`error: ${jobOptions.failureReason}`);
                 handleJobFailureCleanup(appLogger, appOutputWriter, jobOptions);
 
@@ -324,28 +329,39 @@ const FFPROBE_COMMAND = "ffprobe";
 
     function handleJobFailureCleanup(logger: ILogger, outputWriter: IOutputWriter, jobOptions: JobOptions) {
         delete jobOptions.failureReason;
-        let targetFileFullPath: string;
+        let targetFileFullPath = "";
         if (jobOptions.task === "convert") {
-            targetFileFullPath = jobOptions.options.targetFileFullPath;
-            delete jobOptions.result?.commandErrOutput;
-            delete jobOptions.result?.commandStdOutput;
+            targetFileFullPath = jobOptions.commandOptions.targetFileFullPath;
+            delete jobOptions.result?.convertCommandResult;
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore - I am not sure why the line below was giving me guff...
+            delete jobOptions.result?.sourceCheckVideoIntegrityCommandResult;
+            delete jobOptions.result?.targetCheckVideoIntegrityCommandResult;
+            delete jobOptions.result?.failureReason;
+        } else if (jobOptions.task === "getinfo") {
+            delete jobOptions.result?.getVideoInfoCommandResult;
+            delete jobOptions.result?.failureReason;
+        } else if (jobOptions.task === "checkvideointegrity") {
+            delete jobOptions.result?.CheckVideoIntegrityCommandResult;
+            delete jobOptions.result?.failureReason;
         } else if (jobOptions.task === "copy") {
             targetFileFullPath = jobOptions.targetFileFullPath;
+            delete jobOptions.result?.failureReason;
         } else {
-            delete jobOptions.result?.commandErrOutput;
-            delete jobOptions.result?.commandStdOutput;
             logger.LogVerbose("job type does not require cleanup.", { job: jobOptions })
             return;
         }
         logger.LogDebug("attempting to clean up failed job data.", { job: jobOptions });
-        outputWriter.writeLine(`attempting to delete target file if it exists ${targetFileFullPath}`);
-        fileManager.safeUnlinkFile(targetFileFullPath);
-        if (fileManager.exists(targetFileFullPath)) {
-            logger.LogWarn("failed to clean up failed job data", { targetFileFullPath });
-            outputWriter.writeLine(`failed to clean up failed job data ${targetFileFullPath}`);
-        } else {
-            logger.LogInfo("successfully removed failed job file data", { targetFileFullPath });
-            outputWriter.writeLine(`successfully removed failed job file data`);
+        if (targetFileFullPath !== "") {
+            outputWriter.writeLine(`attempting to delete target file if it exists ${targetFileFullPath}`);
+            fileManager.safeUnlinkFile(targetFileFullPath);
+            if (fileManager.exists(targetFileFullPath)) {
+                logger.LogWarn("failed to clean up failed job data", { targetFileFullPath });
+                outputWriter.writeLine(`failed to clean up failed job data ${targetFileFullPath}`);
+            } else {
+                logger.LogInfo("successfully removed failed job file data", { targetFileFullPath });
+                outputWriter.writeLine(`successfully removed failed job file data`);
+            }
         }
     }
 
@@ -418,12 +434,12 @@ const FFPROBE_COMMAND = "ffprobe";
     }
 
     function makeJob(logger: ILogger, task: Task, fileInfo: FileInfo, appOptions: AppOptions): JobOptions {
-        const commandID = getJobCommandID(task);
+        const commandID = getCommandID(task);
         logger.LogVerbose(`making job of type ${task}`, { fileInfo, appOptions, task });
         if (task === "convert") {
             const targetFileFullPath = getTargetFileFullPath(appLogger, fileInfo, appOptions).targetFileFullPath;
-            const videoConvertOptions: VideoConvertOptions = {
-                commandID,
+            const jobID = getJobID(CONVERT_VIDEO_JOB_NAME);
+            const videoConvertOptions: VideoConvertCommandOptions = {
                 tryDeleteTargetFileIfIntegrityCheckFails: true, // TODO: make this configurable.
                 useCuda: appOptions.useCuda,
                 timeoutMilliseconds: CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS,
@@ -431,37 +447,39 @@ const FFPROBE_COMMAND = "ffprobe";
                 targetVideoEncoding: appOptions.targetVideoEncoder,
                 targetContainerFormat: appOptions.targetContainerFormat,
                 targetFileFullPath: targetFileFullPath,
+                keepInvalidConvertResult: appOptions.keepInvalidConvertResult,
                 xArgs: appOptions.xArgs,
             };
             return {
                 baseCommand: FFMPEG_COMMAND,
                 getInfoCommand: FFPROBE_COMMAND,
-                commandID,
+                jobID,
                 fileInfo,
                 host: "local",
                 state: "pending",
                 task: "convert",
-                options: videoConvertOptions,
+                commandOptions: videoConvertOptions,
             } as ConvertJobOptions;
         } else if (task === "getinfo") {
-            const getVideoInfoOptions: GetVideoInfoOptions = {
-                commandID,
+            const jobID = getJobID(GET_VIDEO_INFO_JOB_NAME);
+            const getVideoInfoOptions: GetVideoInfoCommandOptions = {
                 timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
                 xArgs: appOptions.xArgs,
             };
             return {
                 baseCommand: FFPROBE_COMMAND,
-                commandID,
+                jobID,
                 fileInfo,
                 host: "local",
                 state: "pending",
                 task: "getinfo",
-                options: getVideoInfoOptions,
+                commandOptions: getVideoInfoOptions,
             } as GetInfoJobOptions;
         } else if (task === "copy") {
             const targetFileFullPath = getTargetFileFullPath(appLogger, fileInfo, appOptions).targetFileFullPath;
+            const jobID = getJobID(COPY_JOB_NAME);
             return {
-                commandID,
+                jobID,
                 fileInfo,
                 host: "local",
                 state: "pending",
@@ -469,16 +487,18 @@ const FFPROBE_COMMAND = "ffprobe";
                 targetFileFullPath,
             } as CopyJobOptions;
         } else if (task === "checkvideointegrity") {
+            const jobID = getJobID(CHECK_VIDEO_INTEGRITY_JOB_NAME);
             return {
                 baseCommand: FFPROBE_COMMAND,
-                commandID,
+                jobID,
                 fileInfo,
                 host: "local",
                 state: "pending",
                 task: "checkvideointegrity",
-                options: {
-                    commandID,
+                commandOptions: {
+                    commandID: commandID,
                     timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
+                    deleteFailedIntegrityCheckFiles: appOptions.deleteFailedIntegrityCheckFiles,
                     xArgs: [],
                 }
             } as CheckVideoIntegrityJobOptions;

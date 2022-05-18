@@ -1,4 +1,4 @@
-import { CopyResult } from './../VideoConverter/models';
+import { CopyJobResult } from './../VideoConverter/models';
 import { ILogger } from "../Logger";
 import { CopyJobOptions } from "../VideoConverter/models";
 import { BaseJob } from "./BaseJob";
@@ -6,7 +6,9 @@ import { IOutputWriter } from '../OutputWriter';
 import { FileInfo, IFileManager } from '../FileManager';
 import { millisecondsToHHMMSS } from '../PrettyPrint';
 
-export class CopyJob extends BaseJob<CopyJobOptions, CopyResult> {
+export const COPY_JOB_NAME = "copy";
+
+export class CopyJob extends BaseJob<CopyJobOptions, CopyJobResult> {
     constructor(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, options: CopyJobOptions) {
         super(logger, outputWriter, fileManager, options)
     }
@@ -14,7 +16,12 @@ export class CopyJob extends BaseJob<CopyJobOptions, CopyResult> {
     public validateJobOptions(): boolean {
         throw new Error('Method not implemented.');
     }
-    protected _execute(): Promise<CopyResult> {
+
+    public getJobTypeName(): string {
+        return COPY_JOB_NAME;
+    }
+
+    protected _execute(): Promise<CopyJobResult> {
         return new Promise((resolve) => {
             const start = Date.now();
             const sourceFile = this._jobOptions.fileInfo.fullPath;
@@ -22,21 +29,19 @@ export class CopyJob extends BaseJob<CopyJobOptions, CopyResult> {
             this._outputWriter.writeLine(`copying file: ${sourceFile} => ${targetFile}`);
             const success = this._fileManager.copyFile(sourceFile, targetFile);
             let targetFileInfo: FileInfo | undefined;
-            let statusCode = -1;
             if (success === true) {
-                statusCode = 0;
                 targetFileInfo = (this._fileManager.getFSItemFromPath(targetFile) as FileInfo);
             }
             const end = Date.now();
             const duration = end - start;
             resolve({
-                commandID: this._jobOptions.commandID,
+                jobID: this._jobOptions.jobID,
                 durationMilliseconds: duration,
                 durationPretty: millisecondsToHHMMSS(duration),
                 sourceFileInfo: this._jobOptions.fileInfo,
-                statusCode,
                 success,
                 targetFileInfo,
+                failureReason: undefined, // This will throw an error if it fails?
             });
         });
     }

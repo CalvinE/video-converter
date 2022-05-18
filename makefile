@@ -1,5 +1,5 @@
 image_name = cechols/video-converter
-version = 1.0.1
+version = 1.0.2
 nvidia_tag = -nvidia
 
 # non nvidia enabled container

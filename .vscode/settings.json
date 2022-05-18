@@ -12,6 +12,7 @@
         "getinfo",
         "hwaccel",
         "invalidfile",
+        "jobfile",
         "libx",
         "rawvideo",
         "sarg",

@@ -2,8 +2,8 @@ import {
     IFileManager
 } from './../../FileManager';
 import {
-    CheckVideoIntegrityOptions,
-    VideoConvertOptions,
+    CheckVideoIntegrityCommandOptions,
+    VideoConvertCommandOptions,
     VideoIntegrityIssues
 } from './../models';
 import {
@@ -18,11 +18,11 @@ import {
 import {
     CommandCheckResult,
     CommandStdErrMessageReceivedEventData,
-    GetVideoInfoOptions,
+    GetVideoInfoCommandOptions,
     VideoConverterEventName_StdErrMessageReceived,
-    GetVideoInfoResult,
+    GetVideoInfoCommandResult,
     VideoInfo,
-    CheckVideoIntegrityResult,
+    CheckVideoIntegrityCommandResult,
     IVideoConverter,
     CommandStartedEventData,
     CommandRunningEventData,
@@ -36,7 +36,7 @@ import {
     VideoConverterEventName_Finished,
     VideoConverterEventName_Errored,
     VideoConverterEventName_Timedout,
-    ConvertVideoResult,
+    ConvertVideoCommandResult,
     VideoStreamInfo,
     AudioStreamInfo
 } from "../models";
@@ -44,12 +44,8 @@ import {
     dirname
 } from 'path';
 import {
-    bytesToHumanReadableBytes,
     millisecondsToHHMMSS
 } from '../../PrettyPrint';
-import {
-    GET_INFO_COMMAND_TIMEOUT_MILLISECONDS
-} from '../../Jobs/CheckVideoIntegrityJob';
 
 export class FFMPEGVideoConverter extends CommandRunner implements IVideoConverter {
 
@@ -69,10 +65,10 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this._logger.LogVerbose("checking to see if command can be run.", { command: this._ffmpegCommand });
         const checkCommandsCommandID = "checkCommands";
         const ffmpegArgs = ["-h"];
-        const commandResult = await this.executeCommand(this._ffmpegCommand, ffmpegArgs, checkCommandsCommandID, 10000000);
+        const commandResult = await this.executeCommand(this._ffmpegCommand, ffmpegArgs, checkCommandsCommandID, checkCommandsCommandID, 10000000);
         this._logger.LogVerbose("finished check of command", commandResult);
         const ffprobeArgs = ["-L"];
-        const ffprobeResult = await this.executeCommand(this._ffprobeCommand, ffprobeArgs, checkCommandsCommandID, 10000000);
+        const ffprobeResult = await this.executeCommand(this._ffprobeCommand, ffprobeArgs, checkCommandsCommandID, checkCommandsCommandID, 10000000);
         this._logger.LogVerbose("finished check of command", ffprobeResult);
         const duration = commandResult.durationMilliseconds + ffprobeResult.durationMilliseconds;
         return {
@@ -126,7 +122,9 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         this.emit(VideoConverterEventName_Timedout, data);
     }
 
-    public async checkVideoIntegrity(sourceFile: FileInfo, options: CheckVideoIntegrityOptions): Promise<CheckVideoIntegrityResult> {
+    // FIXME: the logic around the file integrity checks should be in the job not in this command... in fact there should be no command?
+    // Or do we have a command incase we eventually support more than just FFMPEG?
+    public async checkVideoIntegrity(sourceFile: FileInfo, jobID: string, commandID: string, options: CheckVideoIntegrityCommandOptions): Promise<CheckVideoIntegrityCommandResult> {
         const start = Date.now();
         let isVideoGood = true;
         const issues: VideoIntegrityIssues = {
@@ -134,14 +132,31 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             containerInfoMissing: false,
             getVideoInfoFailed: false,
             isEmptyFile: false,
+            fileDoesNotExist: false, // I think technically this is not possible with how the jobs are currently built?
             videoStreamIsRaw: false,
             videoStreamMissing: false,
         };
+        if (!this._fileManager.exists(sourceFile.fullPath)) {
+            const durationMilliseconds = Date.now() - start;
+            issues.fileDoesNotExist = true;
+            return {
+                commandID,
+                durationMilliseconds,
+                durationPretty: millisecondsToHHMMSS(durationMilliseconds),
+                statusCode: -999,
+                fileInfo: sourceFile,
+                integrityCheck: {
+                    isVideoGood: false,
+                    issues,
+                },
+                success: true,
+            }
+        }
         if (sourceFile.size === 0) {
             const durationMilliseconds = Date.now() - start;
             issues.isEmptyFile = true;
             return {
-                commandID: options.commandID,
+                commandID,
                 durationMilliseconds,
                 durationPretty: millisecondsToHHMMSS(durationMilliseconds),
                 statusCode: -999,
@@ -156,8 +171,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         let videoInfo: VideoInfo | undefined = options.sourceVideoInfoOptions;
 
         if (videoInfo === undefined) {
-            const getVideoInfoResult = await this.getVideoInfo(sourceFile, {
-                commandID: options.commandID,
+            const getVideoInfoResult = await this.getVideoInfo(sourceFile, jobID, commandID, {
                 timeoutMilliseconds: options.timeoutMilliseconds,
                 xArgs: [], // FIXME: need to be able to pass more options in for sub commands...
             });
@@ -166,7 +180,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                 issues.getVideoInfoFailed = true;
                 const durationMilliseconds = Date.now() - start;
                 return {
-                    commandID: options.commandID,
+                    commandID,
                     failureReason: "get info call failed for file",
                     durationMilliseconds,
                     durationPretty: millisecondsToHHMMSS(durationMilliseconds),
@@ -212,7 +226,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
 
         const durationMilliseconds = Date.now() - start;
         return {
-            commandID: options.commandID,
+            commandID,
             durationMilliseconds,
             durationPretty: millisecondsToHHMMSS(durationMilliseconds),
             integrityCheck: {
@@ -226,7 +240,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         }
     }
 
-    public async getVideoInfo(sourceFile: FileInfo, options: GetVideoInfoOptions): Promise<GetVideoInfoResult> {
+    public async getVideoInfo(sourceFile: FileInfo, jobID: string, commandID: string, options: GetVideoInfoCommandOptions): Promise<GetVideoInfoCommandResult> {
         const args = [
             "-hide_banner",
             "-v",
@@ -238,12 +252,12 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             ...options.xArgs,
             `"${sourceFile.fullPath}"`,
         ];
-        const commandResult = await this.executeCommand(this._ffprobeCommand, args, `GetVideoInfo-${options.commandID}`, options.timeoutMilliseconds);
+        const commandResult = await this.executeCommand(this._ffprobeCommand, args, jobID, commandID, options.timeoutMilliseconds);
         const joinedCommandOutput = commandResult.fullOutput.join("");
         const videoInfo: VideoInfo = JSON.parse(joinedCommandOutput);
         this._logger.LogVerbose("video info retrieved", { videoInfo })
         return {
-            commandID: options.commandID,
+            commandID,
             durationMilliseconds: commandResult.durationMilliseconds,
             durationPretty: millisecondsToHHMMSS(commandResult.durationMilliseconds),
             fileInfo: sourceFile,
@@ -255,51 +269,8 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         };
     }
 
-    public async convertVideo(sourceFileInfo: FileInfo, options: VideoConvertOptions): Promise<ConvertVideoResult> {
-        const start = Date.now();
+    public async convertVideo(sourceFileInfo: FileInfo, jobID: string, commandID: string, options: VideoConvertCommandOptions): Promise<ConvertVideoCommandResult> {
         this._logger.LogDebug("attempting to convert a video", { sourceFile: sourceFileInfo, options });
-        const sourceVideoIntegrityCheckResult = await this.checkVideoIntegrity(sourceFileInfo, {
-            commandID: options.commandID,
-            timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-            xArgs: [],
-        })
-        if (sourceVideoIntegrityCheckResult.success === false) {
-            const durationMilliseconds = Date.now() - start;
-            return {
-                commandID: options.commandID,
-                failureReason: "source file failed integrity get info call",
-                sourceFileInfo,
-                commandErrOutput: sourceVideoIntegrityCheckResult.commandErrOutput,
-                commandStdOutput: sourceVideoIntegrityCheckResult.commandStdOutput,
-                sourceVideoInfo: sourceVideoIntegrityCheckResult.videoInfo,
-                sourceFileIntegrityCheck: sourceVideoIntegrityCheckResult.integrityCheck,
-                convertedFileSize: 0,
-                durationMilliseconds,
-                durationPretty: millisecondsToHHMMSS(durationMilliseconds),
-                prettyConvertedFileSize: bytesToHumanReadableBytes(0),
-                sizeDifference: 0,
-                sizeDifferencePretty: bytesToHumanReadableBytes(0),
-                statusCode: -999,
-                success: false,
-            };
-        } else if (sourceVideoIntegrityCheckResult.integrityCheck.isVideoGood === false) {
-            const durationMilliseconds = Date.now() - start;
-            return {
-                commandID: options.commandID,
-                failureReason: "source file failed integrity check",
-                sourceFileInfo,
-                sourceVideoInfo: sourceVideoIntegrityCheckResult.videoInfo,
-                sourceFileIntegrityCheck: sourceVideoIntegrityCheckResult.integrityCheck,
-                convertedFileSize: 0,
-                durationMilliseconds,
-                durationPretty: millisecondsToHHMMSS(durationMilliseconds),
-                prettyConvertedFileSize: bytesToHumanReadableBytes(0),
-                sizeDifference: 0,
-                sizeDifferencePretty: bytesToHumanReadableBytes(0),
-                statusCode: -999,
-                success: false,
-            };
-        }
         const targetFilePath: string = dirname(options.targetFileFullPath)
         this._fileManager.makeDir(targetFilePath);
         let args: string[] = [
@@ -318,97 +289,17 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         if (options.useCuda === true) {
             args = ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-extra_hw_frames", "4", ...args];
         }
-        const commandResult = await this.executeCommand(this._ffmpegCommand, args, options.commandID, options.timeoutMilliseconds);
-        if (commandResult.success === true) {
-            const targetFileInfo: FileInfo = (this._fileManager.getFSItemFromPath(options.targetFileFullPath) as FileInfo);
-            const targetFileIntegrityCheckResult = await this.checkVideoIntegrity(targetFileInfo, {
-                commandID: options.commandID,
-                timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-                xArgs: [],
-            });
-            if (targetFileIntegrityCheckResult.success === false) {
-                const durationMilliseconds = Date.now() - start;
-                return {
-                    commandID: options.commandID,
-                    failureReason: "source file failed integrity get info call",
-                    sourceFileInfo,
-                    commandErrOutput: sourceVideoIntegrityCheckResult.commandErrOutput,
-                    commandStdOutput: sourceVideoIntegrityCheckResult.commandStdOutput,
-                    sourceVideoInfo: sourceVideoIntegrityCheckResult.videoInfo,
-                    sourceFileIntegrityCheck: sourceVideoIntegrityCheckResult.integrityCheck,
-                    targetFileInfo,
-                    targetVideoInfo: targetFileIntegrityCheckResult.videoInfo,
-                    targetFileIntegrityCheck: targetFileIntegrityCheckResult.integrityCheck,
-                    convertedFileSize: 0,
-                    durationMilliseconds,
-                    durationPretty: millisecondsToHHMMSS(durationMilliseconds),
-                    prettyConvertedFileSize: bytesToHumanReadableBytes(0),
-                    sizeDifference: 0,
-                    sizeDifferencePretty: bytesToHumanReadableBytes(0),
-                    statusCode: -999,
-                    success: false,
-                };
-            } else if (targetFileIntegrityCheckResult.integrityCheck.isVideoGood === false) {
-                const durationMilliseconds = Date.now() - start;
-                this._logger.LogError("target video file failed integrity check", new Error("target video file failed integrity check"), { targetFileIntegrityCheckResult });
-                if (options.tryDeleteTargetFileIfIntegrityCheckFails === true) {
-                    const didDelete = this._fileManager.safeUnlinkFile(targetFileInfo.fullPath);
-                    this._logger.LogWarn("attempting to delete converted file that failed the integrity check", { didDelete });
-                }
-                return {
-                    commandID: options.commandID,
-                    failureReason: "source file failed integrity check",
-                    sourceFileInfo,
-                    sourceVideoInfo: sourceVideoIntegrityCheckResult.videoInfo,
-                    sourceFileIntegrityCheck: sourceVideoIntegrityCheckResult.integrityCheck,
-                    targetFileInfo,
-                    targetVideoInfo: targetFileIntegrityCheckResult.videoInfo,
-                    targetFileIntegrityCheck: targetFileIntegrityCheckResult.integrityCheck,
-                    convertedFileSize: 0,
-                    durationMilliseconds,
-                    durationPretty: millisecondsToHHMMSS(durationMilliseconds),
-                    prettyConvertedFileSize: bytesToHumanReadableBytes(0),
-                    sizeDifference: 0,
-                    sizeDifferencePretty: bytesToHumanReadableBytes(0),
-                    statusCode: -999,
-                    success: false,
-                };
-            }
-            const sizeDiff = sourceFileInfo.size - targetFileInfo.size;
-            return {
-                commandID: options.commandID,
-                durationMilliseconds: commandResult.durationMilliseconds,
-                durationPretty: millisecondsToHHMMSS(commandResult.durationMilliseconds),
-                success: commandResult.success,
-                sourceFileInfo: sourceFileInfo,
-                sourceVideoInfo: sourceVideoIntegrityCheckResult.videoInfo,
-                sourceFileIntegrityCheck: sourceVideoIntegrityCheckResult.integrityCheck,
-                targetFileInfo,
-                targetVideoInfo: targetFileIntegrityCheckResult.videoInfo,
-                targetFileIntegrityCheck: targetFileIntegrityCheckResult.integrityCheck,
-                sizeDifference: sizeDiff,
-                sizeDifferencePretty: bytesToHumanReadableBytes(sizeDiff),
-                convertedFileSize: targetFileInfo.size,
-                prettyConvertedFileSize: bytesToHumanReadableBytes(targetFileInfo.size),
-                statusCode: commandResult.exitCode ?? -999,
-            };
-        }
+        const commandResult = await this.executeCommand(this._ffmpegCommand, args, jobID, commandID, options.timeoutMilliseconds);
         return {
-            commandID: options.commandID,
+            commandID,
             failureReason: "convert command failed",
             durationMilliseconds: commandResult.durationMilliseconds,
             durationPretty: millisecondsToHHMMSS(commandResult.durationMilliseconds),
             success: commandResult.success,
-            sourceFileInfo: sourceFileInfo,
-            sourceVideoInfo: sourceVideoIntegrityCheckResult.videoInfo,
-            sourceFileIntegrityCheck: sourceVideoIntegrityCheckResult.integrityCheck,
-            sizeDifference: 0,
-            sizeDifferencePretty: bytesToHumanReadableBytes(0),
-            convertedFileSize: 0,
-            prettyConvertedFileSize: bytesToHumanReadableBytes(0),
             statusCode: commandResult.exitCode ?? -999,
             commandErrOutput: commandResult.fullStdErrOutput,
             commandStdOutput: commandResult.fullOutput,
+            targetFileFullPath: commandResult.success === true ? options.targetFileFullPath : undefined,
         };
     }
 }

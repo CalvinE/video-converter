@@ -15,52 +15,8 @@ export type Task = SubCommand | `${typeof COPY}`;
 
 export type State = "pending" | "running" | "completed" | "error" | "invalidfile";
 
-export type BaseJobOptions = {
-  commandID: string;
-  host: string;
-  failureReason?: string;
-  fileInfo: FileInfo;
-  state: State;
-  task: Task;
-}
-
-export type VideoCommandJobOptions = BaseJobOptions & {
-  baseCommand: string;
-};
-
-export type ConvertJobOptions = VideoCommandJobOptions & {
-  task: "convert";
-  getInfoCommand: string;
-  options: VideoConvertOptions;
-  result?: ConvertVideoResult;
-}
-
-export type GetInfoJobOptions = VideoCommandJobOptions & {
-  task: "getinfo";
-  options: GetVideoInfoOptions;
-  result?: GetVideoInfoResult;
-}
-
-export type CopyJobOptions = BaseJobOptions & {
-  task: "copy";
-  targetFileFullPath: string;
-  result?: CopyResult;
-};
-
-export type CheckVideoIntegrityJobOptions = VideoCommandJobOptions & {
-  task: "checkvideointegrity";
-  options: CheckVideoIntegrityOptions;
-  result?: CheckVideoIntegrityResult;
-};
-
-export type JobOptions = (ConvertJobOptions | GetInfoJobOptions | CopyJobOptions | CheckVideoIntegrityJobOptions);
-
-// export type Job = CopyJobOptions | ConvertJobOptions | GetInfoJobOptions;
-
-export type JobsOptionsArray = Array<JobOptions>;
-
 export type JobFile = {
-  jobID: string;
+  jobFileID: string;
   jobName: string;
   options: AppOptions;
   jobs: JobsOptionsArray;
@@ -113,29 +69,129 @@ export const CommandStateName_TimedOut = "timeout"
 
 export type CommandState = `${typeof CommandStateName_Pending | typeof CommandStateName_Started | typeof CommandStateName_Running | typeof CommandStateName_Finished | typeof CommandStateName_Errored | typeof CommandStateName_TimedOut}`
 
+// Job Options
+
+export type BaseJobOptions = {
+  jobID: string;
+  host: string;
+  failureReason?: string;
+  fileInfo: FileInfo;
+  state: State;
+  task: Task;
+}
+
+export type VideoCommandJobOptions = BaseJobOptions & {
+  baseCommand: string;
+};
+
+export type ConvertJobOptions = VideoCommandJobOptions & {
+  task: "convert";
+  getInfoCommand: string;
+  commandOptions: VideoConvertCommandOptions;
+  result?: ConvertVideoJobResult;
+}
+
+export type GetInfoJobOptions = VideoCommandJobOptions & {
+  task: "getinfo";
+  commandOptions: GetVideoInfoCommandOptions;
+  result?: GetVideoInfoJobResult;
+}
+
+export type CopyJobOptions = BaseJobOptions & {
+  task: "copy";
+  targetFileFullPath: string;
+  result?: CopyJobResult;
+};
+
+export type CheckVideoIntegrityJobOptions = VideoCommandJobOptions & {
+  task: "checkvideointegrity";
+  commandOptions: CheckVideoIntegrityCommandOptions;
+  result?: CheckVideoIntegrityJobResult;
+};
+
+export type JobOptions = (ConvertJobOptions | GetInfoJobOptions | CopyJobOptions | CheckVideoIntegrityJobOptions);
+
+export type JobsOptionsArray = Array<JobOptions>;
+
+// Job Results
+
+export type BaseJobResult = {
+  jobID: string;
+  durationMilliseconds: number;
+  durationPretty: string;
+  success: boolean;
+  failureReason?: string;
+}
+
+type OmittedConvertVideoCommandResult = Omit<ConvertVideoCommandResult, "targetFileFullPath">;
+type OmittedCheckVideoIntegrityCommandResult = Omit<CheckVideoIntegrityCommandResult, "fileInfo" | "videoInfo" | "integrityCheck">;
+type OmittedGetVideoInfoCommandResult = Omit<GetVideoInfoCommandResult, "videoInfo" | "fileInfo">
+
+export type ConvertVideoJobResult = BaseJobResult & {
+  convertedFileSize: number;
+  prettyConvertedFileSize: string;
+  sizeDifference: number;
+  sizeDifferencePretty: string;
+  sourceFileInfo: FileInfo
+  sourceVideoIntegrityCheck: IntegrityCheckResult;
+  sourceVideoInfo?: VideoInfo;
+  // Only populated when the command fails (not if the file is not valid, but the command fails)
+  sourceCheckVideoIntegrityCommandResult?: OmittedCheckVideoIntegrityCommandResult;
+  targetFileInfo?: FileInfo
+  targetVideoIntegrityCheck?: IntegrityCheckResult;
+  targetVideoInfo?: VideoInfo;
+  // Only populated when the command fails (not if the file is not valid, but the command fails)
+  targetCheckVideoIntegrityCommandResult?: OmittedCheckVideoIntegrityCommandResult;
+  // Only populated when the command fails
+  convertCommandResult?: OmittedConvertVideoCommandResult
+}
+
+export type GetVideoInfoJobResult = BaseJobResult & {
+  fileInfo?: FileInfo;
+  videoInfo?: VideoInfo;
+  // Only populated when the command fails (not if the file is not valid, but the command fails)
+  getVideoInfoCommandResult?: OmittedGetVideoInfoCommandResult;
+}
+
+export type CheckVideoIntegrityJobResult = BaseJobResult & {
+  integrityCheck: IntegrityCheckResult;
+  fileInfo?: FileInfo,
+  videoInfo?: VideoInfo,
+  // Only populated when the command fails (not if the file is not valid, but the command fails)
+  CheckVideoIntegrityCommandResult?: OmittedCheckVideoIntegrityCommandResult;
+}
+
+export type CopyJobResult = BaseJobResult & {
+  sourceFileInfo: FileInfo;
+  targetFileInfo?: FileInfo;
+};
+
+// command options
 
 type BaseVideoConverterOptions = {
-  commandID: string;
   timeoutMilliseconds: number;
   xArgs: string[];
 };
 
-export type GetVideoInfoOptions = BaseVideoConverterOptions;
+export type GetVideoInfoCommandOptions = BaseVideoConverterOptions;
 
-export type CheckVideoIntegrityOptions = BaseVideoConverterOptions & {
+export type CheckVideoIntegrityCommandOptions = BaseVideoConverterOptions & {
   sourceVideoInfoOptions?: VideoInfo;
+  deleteFailedIntegrityCheckFiles: boolean;
 };
 
-export type VideoConvertOptions = BaseVideoConverterOptions & {
+export type VideoConvertCommandOptions = BaseVideoConverterOptions & {
   useCuda: boolean;
   targetFileFullPath: string;
   targetVideoEncoding: VideoEncoder;
   targetAudioEncoding: AudioEncoder;
   targetContainerFormat: VideoContainerFormat;
   tryDeleteTargetFileIfIntegrityCheckFails: boolean;
+  keepInvalidConvertResult: boolean;
 };
 
-export type BaseJobResult = {
+// Command results
+export type BaseCommandResult = {
   commandID: string;
   durationMilliseconds: number;
   durationPretty: string;
@@ -146,7 +202,7 @@ export type BaseJobResult = {
   commandErrOutput?: string[];
 }
 
-export type CommandCheckResult = BaseJobResult & {
+export type CommandCheckResult = BaseCommandResult & {
   results: Array<{
     command: string,
     args: string[],
@@ -154,25 +210,17 @@ export type CommandCheckResult = BaseJobResult & {
   }>;
 }
 
-export type GetVideoInfoResult = BaseJobResult & {
+export type GetVideoInfoCommandResult = BaseCommandResult & {
   videoInfo: VideoInfo;
   fileInfo: FileInfo;
 }
 
-export type ConvertVideoResult = BaseJobResult & {
-  sourceFileInfo: FileInfo;
-  sourceVideoInfo?: VideoInfo;
-  sourceFileIntegrityCheck: IntegrityCheckResult;
-  targetFileInfo?: FileInfo;
-  targetVideoInfo?: VideoInfo;
-  targetFileIntegrityCheck?: IntegrityCheckResult;
-  convertedFileSize: number;
-  prettyConvertedFileSize: string;
-  sizeDifference: number;
-  sizeDifferencePretty: string;
+export type ConvertVideoCommandResult = BaseCommandResult & {
+  targetFileFullPath?: string;
 };
 
 export type VideoIntegrityIssues = {
+  fileDoesNotExist: boolean;
   isEmptyFile: boolean;
   getVideoInfoFailed: boolean;
   videoStreamMissing: boolean;
@@ -186,19 +234,17 @@ export type IntegrityCheckResult = {
   issues?: VideoIntegrityIssues;
 };
 
-export type CheckVideoIntegrityResult = BaseJobResult & {
+export type CheckVideoIntegrityCommandResult = BaseCommandResult & {
   fileInfo: FileInfo;
   videoInfo?: VideoInfo
   integrityCheck: IntegrityCheckResult
 };
 
-export type CopyResult = BaseJobResult & {
-  sourceFileInfo: FileInfo;
-  targetFileInfo?: FileInfo;
-};
+// video converter command events
 
 type BaseVideoConverterEvent = {
-  commandId: string;
+  commandID: string;
+  jobID: string;
   currentState: CommandState;
   elapsedTimeMilliseconds: number;
   elapsedTimePretty: string;
@@ -231,25 +277,28 @@ export type CommandTimedoutEventData = BaseVideoConverterEvent & {
 
 
 export interface IVideoConverter {
-  getVideoInfo: (sourceFile: FileInfo, options: GetVideoInfoOptions) => Promise<GetVideoInfoResult>;
-  convertVideo: (sourceFile: FileInfo, options: VideoConvertOptions) => Promise<ConvertVideoResult>;
-  checkVideoIntegrity: (sourceFile: FileInfo, options: CheckVideoIntegrityOptions) => Promise<CheckVideoIntegrityResult>;
+  getVideoInfo: (sourceFile: FileInfo, jobID: string, commandID: string, options: GetVideoInfoCommandOptions) => Promise<GetVideoInfoCommandResult>;
+  convertVideo: (sourceFile: FileInfo, jobID: string, commandID: string, options: VideoConvertCommandOptions) => Promise<ConvertVideoCommandResult>;
+  checkVideoIntegrity: (sourceFile: FileInfo, jobID: string, commandID: string, options: CheckVideoIntegrityCommandOptions) => Promise<CheckVideoIntegrityCommandResult>;
 }
 
-export function getVideoInfoCommandID(): string {
-  return `getVideoInfo-${randomUUID()}`
+// It is very important that all commands run have a unique id.
+export function getCommandID(commandName: Task, jobID?: string): string {
+  if (jobID !== undefined && jobID !== "") {
+    return `${commandName}-${jobID}-${randomUUID()}`;
+  }
+  return `command-${commandName}-${randomUUID()}`;
 }
 
-export function getConvertVideoCommandID(): string {
-  return `convertVideoCodec-${randomUUID()}`
+export function getJobFileID(jobName?: string): string {
+  if (jobName !== "" && jobName !== undefined) {
+    return `jobfile-${jobName}-${randomUUID()}`;
+  }
+  return `jobfile-${randomUUID()}`;
 }
 
-export function getJobCommandID(task: Task): string {
-  return `${task}-${randomUUID()}`
-}
-
-export function getJobID(): string {
-  return `job-${randomUUID()}`
+export function getJobID(jobTypeName: string): string {
+  return `${jobTypeName}-${randomUUID()}`;
 }
 
 export type VideoInfo = {
@@ -277,7 +326,6 @@ export type VideoFormatTags = {
   compatible_brands: string;
   encoder: string;
 }
-
 
 export type VideoStreamInfo = {
   index: number;
