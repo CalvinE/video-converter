@@ -236,26 +236,22 @@ const metaDataPath = join(".", "output");
                     sizeBytesReduction = jobOptions.result.sizeDifference;
                     sourceFile = jobOptions.result.sourceFileInfo.fullPath;
                     targetFile = jobOptions.result.targetFileInfo?.fullPath ?? "";
-                    jobOptions.state = "completed";
                     success = result.success;
                 } else if (jobOptions.task === "getinfo") {
                     jobOptions.result = result as GetVideoInfoJobResult;
                     durationMilliseconds = result.durationMilliseconds;
                     sourceFile = jobOptions.result.fileInfo?.fullPath ?? "";
-                    jobOptions.state = "completed";
                     success = result.success
                 } else if (jobOptions.task === "copy") {
                     jobOptions.result = result as CopyJobResult;
                     durationMilliseconds = result.durationMilliseconds;
                     sourceFile = jobOptions.result.sourceFileInfo.fullPath;
                     targetFile = jobOptions.result.targetFileInfo?.fullPath ?? "";
-                    jobOptions.state = "completed";
                     success = result.success;
                 } else if (jobOptions.task === "checkvideointegrity") {
                     jobOptions.result = result as CheckVideoIntegrityJobResult;
                     durationMilliseconds = result.durationMilliseconds;
                     sourceFile = jobOptions.result?.fileInfo?.fullPath ?? "";
-                    jobOptions.state = "completed";
                     success = result.success
                 }
                 else {
@@ -275,6 +271,7 @@ const metaDataPath = join(".", "output");
                     appOutputWriter.writeLine(`run time: ${millisecondsToHHMMSS(durationMilliseconds)}`);
                 } else {
                     successfulJobs++;
+                    jobOptions.state = "completed";
                     appLogger.LogInfo("job successful", { job: jobOptions });
                     appOutputWriter.writeLine(`job finished: ${jobOptions.jobID}`);
                     appOutputWriter.writeLine(`run time: ${millisecondsToHHMMSS(durationMilliseconds)}`);
