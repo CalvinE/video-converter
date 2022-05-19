@@ -69,7 +69,7 @@ const WRITE_PRETTY_JOB_FILE = true;
 const FFMPEG_COMMAND = "ffmpeg";
 const FFPROBE_COMMAND = "ffprobe";
 
-
+const metaDataPath = join(".", "output");
 
 /* 
     TODO: list
@@ -92,7 +92,7 @@ const FFPROBE_COMMAND = "ffprobe";
 (async function () {
     let appOptions: AppOptions = ParseOptions();
     // const logger: ILogger = new PrettyJSONConsoleLogger("verbose");
-    const appLogger: ILogger = new FileLogger("info", join(".", "output", "logs"), true);
+    const appLogger: ILogger = new FileLogger("info", join(metaDataPath, "logs"), true);
     appLogger.LogDebug("application starting", { appOptions })
     const appOutputWriter: IOutputWriter = new ConsoleOutputWriter();
     await appOutputWriter.initialize()
@@ -172,11 +172,13 @@ const FFPROBE_COMMAND = "ffprobe";
                 options: appOptions,
                 jobs,
             });
-            if (appOptions.saveJobFileOnly === true) {
-                appLogger.LogInfo("exiting because saveJobFile flag is present.", { savedJobFileOnly: appOptions.saveJobFileOnly });
-                appOutputWriter.writeLine(`saving job file (${jobs.length} jobs) jobs to ${jobFileFullPath}`);
-                return;
-            }
+        }
+        const jobFileData = jobFileManager.readJobFileData();
+        if (appOptions.saveJobFileOnly === true) {
+            appLogger.LogVerbose("job file data", { jobFileFullPath, jobFileData })
+            appLogger.LogInfo("exiting because saveJobFile flag is present.", { savedJobFileOnly: appOptions.saveJobFileOnly });
+            appOutputWriter.writeLine(`saving job file (${jobFileData.jobs.length} jobs) jobs to ${jobFileFullPath}`);
+            return;
         }
         // handle Ctrl+C make sure to flush job file.
         process.on("SIGINT", async () => {
@@ -184,7 +186,6 @@ const FFPROBE_COMMAND = "ffprobe";
             throw new Error("SIGINT received, terminating application...")
         });
         appLogger.LogVerbose("processing jobs due to lack of saveJobFileOnly flag", { savedJobFileOnly: appOptions.saveJobFileOnly })
-        const jobFileData = jobFileManager.readJobFileData();
         appLogger.LogVerbose("about to restore app options from job file", { oldAppOptions: appOptions });
         appOptions = jobFileData.options;
         appLogger.LogInfo("restoring app options from job file", { appOptions });
@@ -321,6 +322,7 @@ const FFPROBE_COMMAND = "ffprobe";
         appOutputWriter.writeLine("app encountered fatal error, please see the logs");
     } finally {
         appLogger.LogInfo("The job file for this run was saved", { jobFile: jobFileFullPath });
+        appOutputWriter.writeLine(`log and job file are located at: ${resolve(metaDataPath)}`);
         appOutputWriter.writeLine(`The job file for this run is located at: ${jobFileFullPath}`);
         await appOutputWriter.shutdown();
         await appLogger.shutdown();
@@ -451,6 +453,8 @@ const FFPROBE_COMMAND = "ffprobe";
                 getInfoCommand: FFPROBE_COMMAND,
                 jobID,
                 keepInvalidConvertResult: appOptions.keepInvalidConvertResult,
+                allowClobberExisting: appOptions.convertVideoAllowClobber,
+                skipConvertExisting: appOptions.convertVideoSkipConvertExisting,
                 fileInfo,
                 host: "local",
                 state: "pending",

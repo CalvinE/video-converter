@@ -89,6 +89,8 @@ export type ConvertJobOptions = VideoCommandJobOptions & {
   getInfoCommand: string;
   commandOptions: VideoConvertCommandOptions;
   keepInvalidConvertResult: boolean;
+  allowClobberExisting: boolean;
+  skipConvertExisting: boolean;
   result?: ConvertVideoJobResult;
 }
 
