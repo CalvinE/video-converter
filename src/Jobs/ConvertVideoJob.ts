@@ -6,7 +6,6 @@ import { ILogger } from '../Logger';
 import { IOutputWriter } from '../OutputWriter';
 import { CommandStdErrMessageReceivedEventData, ConvertJobOptions, VideoConverterEventName_StdErrMessageReceived, VideoStreamInfo } from '../VideoConverter/models';
 import { BaseJob } from "./BaseJob";
-import { GET_INFO_COMMAND_TIMEOUT_MILLISECONDS } from './GetVideoInfoJob';
 import { bytesToHumanReadableBytes, HHMMSSmmToSeconds, millisecondsToHHMMSS } from '../PrettyPrint';
 
 const PROGRESSIVE_UPDATE_CHAR_WIDTH = 40;
@@ -28,6 +27,26 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
         return CONVERT_VIDEO_JOB_NAME;
     }
 
+    protected _handleJobFailureCleanup(): void {
+        delete this._jobOptions.result?.convertCommandResult;
+        delete this._jobOptions.result?.sourceCheckVideoIntegrityCommandResult;
+        delete this._jobOptions.result?.targetCheckVideoIntegrityCommandResult;
+        delete this._jobOptions.result?.failureReason;
+        this._logger.LogDebug("attempting to clean up failed job data.", { job: this._jobOptions });
+        const targetFileFullPath = this._jobOptions.commandOptions.targetFileFullPath;
+        if (targetFileFullPath !== "") {
+            this._outputWriter.writeLine(`attempting to delete target file if it exists ${targetFileFullPath}`);
+            this._fileManager.safeUnlinkFile(targetFileFullPath);
+            if (this._fileManager.exists(targetFileFullPath)) {
+                this._logger.LogWarn("failed to clean up failed job data", { targetFileFullPath });
+                this._outputWriter.writeLine(`failed to clean up failed job data ${targetFileFullPath}`);
+            } else {
+                this._logger.LogInfo("successfully removed failed job file data", { targetFileFullPath });
+                this._outputWriter.writeLine(`successfully removed failed job file data`);
+            }
+        }
+    }
+
     protected async _execute(): Promise<ConvertVideoJobResult> {
         const start = Date.now();
         let sizeBeforeConvert = 0;
@@ -41,10 +60,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
         const sourceIntegrityCheckCommandID = getCommandID("checkvideointegrity");
         this._logger.LogDebug("getting video file info so that we can calculate progressive updates", { commandID: sourceIntegrityCheckCommandID, })
         const getSourceInfoFFMPEGCommand = new FFMPEGVideoConverter(this._logger, this._fileManager, this._jobOptions.baseCommand, this._jobOptions.getInfoCommand);
-        const sourceCheckVideoIntegrityCommandResult = await getSourceInfoFFMPEGCommand.checkVideoIntegrity(this._jobOptions.fileInfo, this._jobOptions.jobID, sourceIntegrityCheckCommandID, {
-            timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-            xArgs: [],
-        })
+        const sourceCheckVideoIntegrityCommandResult = await getSourceInfoFFMPEGCommand.checkVideoIntegrity(this._jobOptions.fileInfo, this._jobOptions.jobID, sourceIntegrityCheckCommandID, this._jobOptions.getVideoInfoCommandOptions)
         if (sourceCheckVideoIntegrityCommandResult.success === false) {
             const msg = "failed to get source video info";
             failureReason = msg;
@@ -109,10 +125,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
                 targetFileInfo = this._fileManager.getFSItemFromPath(this._jobOptions.commandOptions.targetFileFullPath ?? "") as FileInfo;
                 const targetFileVideoInfoCommand = new FFMPEGVideoConverter(this._logger, this._fileManager, this._jobOptions.baseCommand, this._jobOptions.getInfoCommand);
                 const targetIntegrityCheckCommandID = getCommandID("checkvideointegrity");
-                targetCheckVideoIntegrityResult = await targetFileVideoInfoCommand.checkVideoIntegrity(targetFileInfo, this._jobOptions.jobID, targetIntegrityCheckCommandID, {
-                    timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-                    xArgs: [],
-                });
+                targetCheckVideoIntegrityResult = await targetFileVideoInfoCommand.checkVideoIntegrity(targetFileInfo, this._jobOptions.jobID, targetIntegrityCheckCommandID, this._jobOptions.getVideoInfoCommandOptions);
                 targetVideoInfo = targetCheckVideoIntegrityResult.videoInfo;
                 targetVideoIntegrityCheck = targetCheckVideoIntegrityResult.integrityCheck;
                 sizeAfterConvert = targetFileInfo.size;

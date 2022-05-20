@@ -21,6 +21,21 @@ export class CopyJob extends BaseJob<CopyJobOptions, CopyJobResult> {
         return COPY_JOB_NAME;
     }
 
+    protected _handleJobFailureCleanup(): void {
+        const targetFileFullPath = this._jobOptions.targetFileFullPath;
+        if (targetFileFullPath !== "") {
+            this._outputWriter.writeLine(`attempting to delete target file if it exists ${targetFileFullPath}`);
+            this._fileManager.safeUnlinkFile(targetFileFullPath);
+            if (this._fileManager.exists(targetFileFullPath)) {
+                this._logger.LogWarn("failed to clean up failed job data", { targetFileFullPath });
+                this._outputWriter.writeLine(`failed to clean up failed job data ${targetFileFullPath}`);
+            } else {
+                this._logger.LogInfo("successfully removed failed job file data", { targetFileFullPath });
+                this._outputWriter.writeLine(`successfully removed failed job file data`);
+            }
+        }
+    }
+
     protected _execute(): Promise<CopyJobResult> {
         return new Promise((resolve) => {
             const start = Date.now();

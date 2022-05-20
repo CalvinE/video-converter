@@ -91,6 +91,8 @@ export type ConvertJobOptions = VideoCommandJobOptions & {
   keepInvalidConvertResult: boolean;
   allowClobberExisting: boolean;
   skipConvertExisting: boolean;
+  // This is used for both the source info and target info calls. its mainly to pass the timeout to each for this command...
+  getVideoInfoCommandOptions: GetVideoInfoCommandOptions;
   result?: ConvertVideoJobResult;
 }
 

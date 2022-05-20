@@ -5,7 +5,6 @@ import { IOutputWriter } from '../OutputWriter/models';
 import { getCommandID, GetInfoJobOptions, GetVideoInfoJobResult } from '../VideoConverter/models';
 import { BaseJob } from './BaseJob';
 
-export const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
 export const GET_VIDEO_INFO_JOB_NAME = "getVideoInfo";
 
 export class GetVideoInfoJob extends BaseJob<GetInfoJobOptions, GetVideoInfoJobResult> {
@@ -19,6 +18,11 @@ export class GetVideoInfoJob extends BaseJob<GetInfoJobOptions, GetVideoInfoJobR
 
     public getJobTypeName(): string {
         return GET_VIDEO_INFO_JOB_NAME;
+    }
+
+    protected _handleJobFailureCleanup(): void {
+        delete this._jobOptions.result?.getVideoInfoCommandResult;
+        delete this._jobOptions.result?.failureReason;
     }
 
     protected async _execute(): Promise<GetVideoInfoJobResult> {

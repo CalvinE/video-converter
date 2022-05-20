@@ -5,6 +5,9 @@ import { dateToFileSafeDate } from './PrettyPrint';
 import { join } from 'path';
 
 const DEFAULT_APPROVED_FILE_EXTENSIONS: string[] = [".mp4", ".mkv", ".avi", ".mov"];
+const DEFAULT_GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
+const DEFAULT_FFMPEG_COMMAND = "ffmpeg";
+const DEFAULT_FFPROBE_COMMAND = "ffprobe";
 // const DEFAULT_FILES_TO_COPY: string[] = [".jpg", ".srt"];
 
 const SOURCE_PATH_OPTION_NAME = "sourcePath";
@@ -20,7 +23,9 @@ const SAVE_PATH_OPTION_NAME = "savePath";
 const COPY_RELATIVE_FOLDER_PATHS = "copyRelativeFolderPath";
 const SAVE_IN_PLACE = "saveInPlace";
 const GET_INFO_OPTION_NAME = "getInfo";
+const GET_VIDEO_INFO_TIMEOUT_MILLISECONDS_OPTIONS_NAME = "getVideoInfoTimeoutMilliseconds";
 const CONVERT_VIDEO_OPTION_NAME = "convertVideo";
+const CONVERT_VIDEO_TIMEOUT_MILLISECONDS_OPTIONS_NAME = "convertVideoTimeoutMilliseconds";
 const CONVERT_VIDEO_ALLOW_CLOBBER_OPTION_NAME = "convertVideoAllowClobber";
 const CONVERT_VIDEO_SKIP_CONVERT_EXISTING_OPTION_NAME = "convertVideoSkipConvertExisting";
 const CHECK_VIDEO_INTEGRITY_OPTION_NAME = "checkVideoIntegrity"
@@ -30,6 +35,8 @@ const CONCURRENT_JOBS_OPTION_NAME = "concurrentJobs";
 const KEEP_FAILED_INTEGRITY_CONVERTED = "keepInvalidConvertResult";
 const DELETE_FAILED_INTEGRITY_CHECK_FILES = "deleteFailedIntegrityCheckFiles";
 const X_ARGS_OPTION_NAME = "xArgs"
+const FFMPEG_COMMAND_OPTION_NAME = "ffmpegCommand";
+const FFPROBE_COMMAND_OPTION_NAME = "ffprobeCommand";
 const HELP_OPTION_NAME = "help";
 
 export type AppOptions = {
@@ -46,7 +53,9 @@ export type AppOptions = {
     [COPY_RELATIVE_FOLDER_PATHS]: boolean;
     [SAVE_IN_PLACE]: boolean;
     [GET_INFO_OPTION_NAME]: boolean;
+    [GET_VIDEO_INFO_TIMEOUT_MILLISECONDS_OPTIONS_NAME]: number;
     [CONVERT_VIDEO_OPTION_NAME]: boolean;
+    [CONVERT_VIDEO_TIMEOUT_MILLISECONDS_OPTIONS_NAME]: number;
     [CONVERT_VIDEO_ALLOW_CLOBBER_OPTION_NAME]: boolean;
     [CONVERT_VIDEO_SKIP_CONVERT_EXISTING_OPTION_NAME]: boolean;
     [CHECK_VIDEO_INTEGRITY_OPTION_NAME]: boolean;
@@ -56,6 +65,8 @@ export type AppOptions = {
     [KEEP_FAILED_INTEGRITY_CONVERTED]: boolean;
     [DELETE_FAILED_INTEGRITY_CHECK_FILES]: boolean;
     [X_ARGS_OPTION_NAME]: string[];
+    [FFMPEG_COMMAND_OPTION_NAME]: string;
+    [FFPROBE_COMMAND_OPTION_NAME]: string;
     [HELP_OPTION_NAME]: boolean;
 }
 
@@ -82,7 +93,9 @@ export function ParseOptions(): AppOptions {
         saveInPlace: false,
         copyRelativeFolderPath: false,
         getInfo: false,
+        getVideoInfoTimeoutMilliseconds: DEFAULT_GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
         convertVideo: false,
+        convertVideoTimeoutMilliseconds: 0,
         convertVideoAllowClobber: false,
         convertVideoSkipConvertExisting: false,
         checkVideoIntegrity: false,
@@ -92,6 +105,8 @@ export function ParseOptions(): AppOptions {
         keepInvalidConvertResult: false,
         deleteFailedIntegrityCheckFiles: false,
         xArgs: [],
+        ffmpegCommand: DEFAULT_FFMPEG_COMMAND,
+        ffprobeCommand: DEFAULT_FFPROBE_COMMAND,
         help: false,
     };
     for (let i = 2; i < argv.length; i++) {

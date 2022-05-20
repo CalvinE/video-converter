@@ -22,6 +22,11 @@ export class CheckVideoIntegrityJob extends BaseJob<CheckVideoIntegrityJobOption
         return CHECK_VIDEO_INTEGRITY_JOB_NAME;
     }
 
+    protected _handleJobFailureCleanup(): void {
+        delete this._jobOptions.result?.CheckVideoIntegrityCommandResult;
+        delete this._jobOptions.result?.failureReason;
+    }
+
     protected async _execute(): Promise<CheckVideoIntegrityJobResult> {
         this._outputWriter.writeLine(`checking video integrity of: ${this._jobOptions.fileInfo.fullPath}`);
         const ffmpegCommand = new FFMPEGVideoConverter(this._logger, this._fileManager, "", this._jobOptions.baseCommand);

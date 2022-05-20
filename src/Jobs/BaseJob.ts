@@ -46,6 +46,13 @@ export abstract class BaseJob<O extends BaseJobOptions, R extends BaseJobResult>
         return result;
     }
 
+    protected abstract _handleJobFailureCleanup(): void;
+
+    public handleJobFailureCleanup() {
+        delete this._jobOptions.failureReason;
+        this._handleJobFailureCleanup();
+    }
+
     public GetJobTaskName(): string {
         return this._jobOptions.task;
     }

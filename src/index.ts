@@ -1,7 +1,3 @@
-import { CHECK_VIDEO_INTEGRITY_JOB_NAME } from './Jobs/CheckVideoIntegrityJob';
-import { COPY_JOB_NAME } from './Jobs/CopyJob';
-import { GET_VIDEO_INFO_JOB_NAME } from './Jobs/GetVideoInfoJob';
-import { CONVERT_VIDEO_JOB_NAME } from './Jobs/ConvertVideoJob';
 import { JobFactory } from './Jobs/JobFactory';
 import {
     IJobFileManager,
@@ -14,20 +10,12 @@ import {
     resolve
 } from 'path';
 import {
-    VideoConvertCommandOptions,
-    GetVideoInfoCommandOptions,
     Task,
     SubCommand,
     INVALID,
     JobsOptionsArray,
-    getJobID,
     JobFile,
-    JobOptions,
     CopyJobResult,
-    CheckVideoIntegrityJobOptions,
-    CopyJobOptions,
-    ConvertJobOptions,
-    GetInfoJobOptions,
     ConvertVideoJobResult,
     GetVideoInfoJobResult,
     CheckVideoIntegrityJobResult,
@@ -61,13 +49,7 @@ import {
     millisecondsToHHMMSS
 } from './PrettyPrint';
 
-const GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
-const CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS = 0;
-
 const WRITE_PRETTY_JOB_FILE = true;
-
-const FFMPEG_COMMAND = "ffmpeg";
-const FFPROBE_COMMAND = "ffprobe";
 
 const metaDataPath = join(".", "output");
 
@@ -100,7 +82,7 @@ const metaDataPath = join(".", "output");
 
     const jobFileFullPath = resolve(appOptions.jobFile);
 
-    const ffmpegVideoConverter = new FFMPEGVideoConverter(appLogger, fileManager, FFMPEG_COMMAND, FFPROBE_COMMAND);
+    const ffmpegVideoConverter = new FFMPEGVideoConverter(appLogger, fileManager, appOptions.ffmpegCommand, appOptions.ffprobeCommand);
     try {
         if (appOptions.help === true) {
             // print help and return...
@@ -202,11 +184,13 @@ const metaDataPath = join(".", "output");
             appLogger.LogInfo("starting job", { jobID: jobOptions.jobID });
             appOutputWriter.writeLine("");
             appOutputWriter.writeLine(`starting job ${i} of ${numJobs} ${jobOptions.jobID} - ${jobOptions.task}`);
+            const job = JobFactory.MakeJob(appLogger, appOutputWriter, fileManager, jobOptions);
             if (jobOptions.state === "running" || jobOptions.state === "error") {
                 // a job was started, so we need to clean up the what files may have been created
                 appLogger.LogInfo(`job was interrupted or encountered an error attempting to restart job`, { job: jobOptions });
                 appOutputWriter.writeLine(`job was interrupted or encountered an error attempting to restart job`);
-                handleJobFailureCleanup(appLogger, appOutputWriter, jobOptions);
+                // handleJobFailureCleanup(appLogger, appOutputWriter, jobOptions);
+                job.handleJobFailureCleanup();
                 jobOptions.state = "pending";
                 jobFileManager.updateJob(jobOptions);
             } else if (jobOptions.state === "completed") {
@@ -227,7 +211,6 @@ const metaDataPath = join(".", "output");
             try {
                 jobOptions.state = "running";
                 jobFileManager.updateJob(jobOptions);
-                const job = JobFactory.MakeJob(appLogger, appOutputWriter, fileManager, jobOptions);
                 const result = await job.execute();
                 if (jobOptions.task === "convert") {
                     jobOptions.result = result as ConvertVideoJobResult;
@@ -292,7 +275,7 @@ const metaDataPath = join(".", "output");
                 appLogger.LogError("job processing failed", err as Error, { job: jobOptions });
                 appOutputWriter.writeLine(`an error occurred while processing job ${jobOptions.jobID}`);
                 appOutputWriter.writeLine(`error: ${jobOptions.failureReason}`);
-                handleJobFailureCleanup(appLogger, appOutputWriter, jobOptions);
+                // handleJobFailureCleanup(appLogger, appOutputWriter, jobOptions);
 
             } finally {
                 jobFileManager.updateJob(jobOptions);
@@ -325,84 +308,6 @@ const metaDataPath = join(".", "output");
         await appLogger.shutdown();
     }
 
-    function handleJobFailureCleanup(logger: ILogger, outputWriter: IOutputWriter, jobOptions: JobOptions) {
-        delete jobOptions.failureReason;
-        let targetFileFullPath = "";
-        if (jobOptions.task === "convert") {
-            targetFileFullPath = jobOptions.commandOptions.targetFileFullPath;
-            delete jobOptions.result?.convertCommandResult;
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore - I am not sure why the line below was giving me guff...
-            delete jobOptions.result?.sourceCheckVideoIntegrityCommandResult;
-            delete jobOptions.result?.targetCheckVideoIntegrityCommandResult;
-            delete jobOptions.result?.failureReason;
-        } else if (jobOptions.task === "getinfo") {
-            delete jobOptions.result?.getVideoInfoCommandResult;
-            delete jobOptions.result?.failureReason;
-        } else if (jobOptions.task === "checkvideointegrity") {
-            delete jobOptions.result?.CheckVideoIntegrityCommandResult;
-            delete jobOptions.result?.failureReason;
-        } else if (jobOptions.task === "copy") {
-            targetFileFullPath = jobOptions.targetFileFullPath;
-            delete jobOptions.result?.failureReason;
-        } else {
-            logger.LogVerbose("job type does not require cleanup.", { job: jobOptions })
-            return;
-        }
-        logger.LogDebug("attempting to clean up failed job data.", { job: jobOptions });
-        if (targetFileFullPath !== "") {
-            outputWriter.writeLine(`attempting to delete target file if it exists ${targetFileFullPath}`);
-            fileManager.safeUnlinkFile(targetFileFullPath);
-            if (fileManager.exists(targetFileFullPath)) {
-                logger.LogWarn("failed to clean up failed job data", { targetFileFullPath });
-                outputWriter.writeLine(`failed to clean up failed job data ${targetFileFullPath}`);
-            } else {
-                logger.LogInfo("successfully removed failed job file data", { targetFileFullPath });
-                outputWriter.writeLine(`successfully removed failed job file data`);
-            }
-        }
-    }
-
-    function getTargetFileFullPath(logger: ILogger, sourceFile: FileInfo, options: AppOptions): {
-        absoluteParentPath: string,
-        targetFileFullPath: string
-    } {
-        let absoluteParentPath: string;
-        logger.LogVerbose("attempting to build target file full path", { source: sourceFile, options });
-        if (options.saveInPlace) {
-            absoluteParentPath = sourceFile.fullPath;
-            logger.LogDebug("save in place options set. using source file full path", { sourceFileFullPath: sourceFile.fullPath });
-        } else if (options.copyRelativeFolderPath) {
-            const fullRelativePath = join(options.savePath, sourceFile.relativePath);
-            absoluteParentPath = resolve(fullRelativePath);
-            logger.LogDebug("using options save path and source file relative path for target file path", { absoluteParentPath });
-        } else {
-            absoluteParentPath = resolve(options.savePath);
-            logger.LogDebug("using options save path for target file path", { absoluteParentPath });
-        }
-
-        let targetFileName: string;
-        if (options.targetContainerFormat === "copy") {
-            targetFileName = sourceFile.name;
-            logger.LogDebug("option target container format is set to copy, so we are not changing the extension", {});
-        } else {
-            let targetContainerFormat = options.targetContainerFormat;
-            if (targetContainerFormat.startsWith(".")) {
-                targetContainerFormat = targetContainerFormat.substring(1);
-            }
-            // FIXME: validate the target file container extension?
-            targetFileName = `${sourceFile.name.substring(0, sourceFile.name.lastIndexOf("."))}.${targetContainerFormat}`;
-            logger.LogDebug("using option target container format on file name", { targetFileName: targetFileName, targetContainerFormat: options.targetContainerFormat });
-        }
-
-        const targetFileFullPath = join(absoluteParentPath, targetFileName);
-        logger.LogDebug("target file location built", { sourceFile, absoluteParentPath, targetFileFullPath: targetFileName, });
-        return {
-            absoluteParentPath,
-            targetFileFullPath,
-        };
-    }
-
     function doesFileMatchCriteria(logger: ILogger, item: FileInfo, task: Task, allowedFileExtensions: string[], fileNameRegex?: RegExp): boolean {
         if (fileNameRegex !== undefined) {
             if (fileNameRegex.test(item.name)) {
@@ -431,108 +336,32 @@ const metaDataPath = join(".", "output");
         return false;
     }
 
-    function makeJob(logger: ILogger, task: Task, fileInfo: FileInfo, appOptions: AppOptions): JobOptions {
-        logger.LogVerbose(`making job of type ${task}`, { fileInfo, appOptions, task });
-        if (task === "convert") {
-            const targetFileFullPath = getTargetFileFullPath(appLogger, fileInfo, appOptions).targetFileFullPath;
-            const jobID = getJobID(CONVERT_VIDEO_JOB_NAME);
-            const videoConvertOptions: VideoConvertCommandOptions = {
-                useCuda: appOptions.useCuda,
-                timeoutMilliseconds: CONVERT_VIDEO_COMMAND_TIMEOUT_MILLISECONDS,
-                targetAudioEncoding: appOptions.targetAudioEncoder,
-                targetVideoEncoding: appOptions.targetVideoEncoder,
-                targetContainerFormat: appOptions.targetContainerFormat,
-                targetFileFullPath: targetFileFullPath,
-                xArgs: appOptions.xArgs,
-            };
-            return {
-                baseCommand: FFMPEG_COMMAND,
-                getInfoCommand: FFPROBE_COMMAND,
-                jobID,
-                keepInvalidConvertResult: appOptions.keepInvalidConvertResult,
-                allowClobberExisting: appOptions.convertVideoAllowClobber,
-                skipConvertExisting: appOptions.convertVideoSkipConvertExisting,
-                fileInfo,
-                host: "local",
-                state: "pending",
-                task: "convert",
-                commandOptions: videoConvertOptions,
-            } as ConvertJobOptions;
-        } else if (task === "getinfo") {
-            const jobID = getJobID(GET_VIDEO_INFO_JOB_NAME);
-            const getVideoInfoOptions: GetVideoInfoCommandOptions = {
-                timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-                xArgs: appOptions.xArgs,
-            };
-            return {
-                baseCommand: FFPROBE_COMMAND,
-                jobID,
-                fileInfo,
-                host: "local",
-                state: "pending",
-                task: "getinfo",
-                commandOptions: getVideoInfoOptions,
-            } as GetInfoJobOptions;
-        } else if (task === "copy") {
-            const targetFileFullPath = getTargetFileFullPath(appLogger, fileInfo, appOptions).targetFileFullPath;
-            const jobID = getJobID(COPY_JOB_NAME);
-            return {
-                jobID,
-                fileInfo,
-                host: "local",
-                state: "pending",
-                task: "copy",
-                targetFileFullPath,
-            } as CopyJobOptions;
-        } else if (task === "checkvideointegrity") {
-            const jobID = getJobID(CHECK_VIDEO_INTEGRITY_JOB_NAME);
-            return {
-                baseCommand: FFPROBE_COMMAND,
-                jobID,
-                fileInfo,
-                deleteFailedIntegrityCheckFiles: appOptions.deleteFailedIntegrityCheckFiles,
-                host: "local",
-                state: "pending",
-                task: "checkvideointegrity",
-                commandOptions: {
-                    timeoutMilliseconds: GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-                    xArgs: [],
-                }
-            } as CheckVideoIntegrityJobOptions;
-        }
-        const error = new Error(`invalid task type encountered: ${task}`)
-        logger.LogError("invalid task type provided", error, {
-            task,
-            fileInfo,
-            options: appOptions,
-        });
-        throw error;
-    }
+
 
     function getAllJobs(logger: ILogger, subCommand: SubCommand, items: FSItem[], options: AppOptions): JobsOptionsArray {
         logger.LogDebug("getting all files based on parameters", { targetFileNameRegex: options.targetFileNameRegex?.source, allowedFileExtensions: options.allowedFileExtensions })
         const allowCopy = !options.saveInPlace;
-        const jobs: JobsOptionsArray = [];
+        const jobOptions: JobsOptionsArray = [];
         for (const item of items) {
             if (item.type === "file") {
                 if (doesFileMatchCriteria(logger, item, subCommand, options.allowedFileExtensions, options.targetFileNameRegex)) {
-                    jobs.push(makeJob(logger, subCommand, item, options));
+                    jobOptions.push(JobFactory.makeJobOptions(logger, subCommand, item, options));
                 }
                 else if (allowCopy && doesFileMatchCriteria(logger, item, "copy", options.fileCopyExtensions, options.fileCopyRegex)) {
                     // is file one we should copy?
                     logger.LogInfo("copy job created", {
                         fileInfo: item,
                     });
-                    jobs.push(makeJob(logger, "copy", item, options));
+                    jobOptions.push(JobFactory.makeJobOptions(logger, "copy", item, options));
                 } else {
                     logger.LogDebug("file name does not match the selection criteria", { fileName: item.name });
                 }
             } else if (item.type === 'directory') {
                 const subItems: JobsOptionsArray = getAllJobs(logger, subCommand, item.files, options);
-                jobs.push(...subItems);
+                jobOptions.push(...subItems);
             }
         }
-        return jobs;
+        return jobOptions;
     }
 
     function processHelpCommand() {
