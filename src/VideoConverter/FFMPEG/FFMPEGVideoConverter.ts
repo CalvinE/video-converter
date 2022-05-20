@@ -145,6 +145,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                 durationPretty: millisecondsToHHMMSS(durationMilliseconds),
                 statusCode: -999,
                 fileInfo: sourceFile,
+                failureReason: "file does not exist",
                 integrityCheck: {
                     isVideoGood: false,
                     issues,
@@ -161,6 +162,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                 durationPretty: millisecondsToHHMMSS(durationMilliseconds),
                 statusCode: -999,
                 fileInfo: sourceFile,
+                failureReason: "file is empty",
                 integrityCheck: {
                     isVideoGood: false,
                     issues,
@@ -184,7 +186,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                     failureReason: "get info call failed for file",
                     durationMilliseconds,
                     durationPretty: millisecondsToHHMMSS(durationMilliseconds),
-                    statusCode: -999,
+                    statusCode: getVideoInfoResult.statusCode,
                     fileInfo: sourceFile,
                     integrityCheck: {
                         isVideoGood: false,
@@ -197,7 +199,6 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             }
             videoInfo = getVideoInfoResult.videoInfo;
         }
-
         const videoStreamInfo = videoInfo.streams.find(s => s.codec_type === "video") as (VideoStreamInfo | undefined);
         if (videoStreamInfo === undefined) {
             issues.videoStreamMissing = true;
@@ -236,6 +237,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             fileInfo: sourceFile,
             videoInfo: videoInfo,
             statusCode: 0,
+            failureReason: isVideoGood === true ? undefined : "video file failed integrity check",
             success: true,
         }
     }

@@ -192,7 +192,7 @@ const metaDataPath = join(".", "output");
         appLogger.LogInfo("jobs loaded", { numJobs: jobFileData.jobs.length });
         appLogger.LogVerbose("listing all jobs data", { jobFileData });
         appOutputWriter.writeLine(`found ${jobFileData.jobs?.length} jobs based on parameters`);
-        let totalSizeReduction = 0;
+        let totalSizeChange = 0;
         const startTimeMilliseconds = Date.now();
         const numJobs = jobFileData.jobs.length
         let successfulJobs = 0;
@@ -221,7 +221,7 @@ const metaDataPath = join(".", "output");
             appLogger.LogDebug("job options", { job: jobOptions });
             let success = false
             let durationMilliseconds = 0;
-            let sizeBytesReduction = 0;
+            let sizeBytesChange = 0;
             let sourceFile = "";
             let targetFile = "";
             try {
@@ -232,8 +232,8 @@ const metaDataPath = join(".", "output");
                 if (jobOptions.task === "convert") {
                     jobOptions.result = result as ConvertVideoJobResult;
                     durationMilliseconds = result.durationMilliseconds;
-                    totalSizeReduction += jobOptions.result.sizeDifference;
-                    sizeBytesReduction = jobOptions.result.sizeDifference;
+                    totalSizeChange += jobOptions.result.sizeDifference;
+                    sizeBytesChange = jobOptions.result.sizeDifference;
                     sourceFile = jobOptions.result.sourceFileInfo.fullPath;
                     targetFile = jobOptions.result.targetFileInfo?.fullPath ?? "";
                     success = result.success;
@@ -275,8 +275,8 @@ const metaDataPath = join(".", "output");
                     appLogger.LogInfo("job successful", { job: jobOptions });
                     appOutputWriter.writeLine(`job finished: ${jobOptions.jobID}`);
                     appOutputWriter.writeLine(`run time: ${millisecondsToHHMMSS(durationMilliseconds)}`);
-                    if (sizeBytesReduction !== 0) {
-                        appOutputWriter.writeLine(`file size reduced by ${bytesToHumanReadableBytes(sizeBytesReduction)}`);
+                    if (sizeBytesChange !== 0) {
+                        appOutputWriter.writeLine(`file size changed by ${bytesToHumanReadableBytes(sizeBytesChange)}`);
                     }
                     if (sourceFile !== "") {
                         appOutputWriter.writeLine(`source => ${sourceFile}`);
@@ -302,10 +302,10 @@ const metaDataPath = join(".", "output");
         const endTimeMilliseconds = Date.now();
         const durationMilliseconds = endTimeMilliseconds - startTimeMilliseconds;
         const prettyDuration = millisecondsToHHMMSS(durationMilliseconds);
-        const prettyTotalSizeReduction = bytesToHumanReadableBytes(totalSizeReduction);
+        const prettyTotalSizeReduction = bytesToHumanReadableBytes(totalSizeChange);
         const totalJobs = jobFileData.jobs.length;
         appOutputWriter.writeLine("");
-        appLogger.LogInfo("all jobs finished", { prettyDuration, durationMilliseconds, prettyTotalSizeReduction, totalSizeReduction, successfulJobs, failedJobs, totalJobs })
+        appLogger.LogInfo("all jobs finished", { prettyDuration, durationMilliseconds, prettyTotalSizeReduction, totalSizeReduction: totalSizeChange, successfulJobs, failedJobs, totalJobs })
         appOutputWriter.writeLine(`All jobs finished`);
         appOutputWriter.writeLine(`Run time: ${prettyDuration}`);
         appOutputWriter.writeLine(`Total Size Reduction: ${prettyTotalSizeReduction}`);
