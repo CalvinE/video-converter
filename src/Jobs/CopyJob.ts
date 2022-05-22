@@ -40,7 +40,7 @@ export class CopyJob extends BaseJob<CopyJobOptions, CopyJobResult> {
         return new Promise((resolve) => {
             const start = Date.now();
             const sourceFile = this._jobOptions.fileInfo.fullPath;
-            const targetFile = this._jobOptions.fileInfo.fullPath;
+            const targetFile = this._jobOptions.targetFileFullPath;
             this._outputWriter.writeLine(`copying file: ${sourceFile} => ${targetFile}`);
             const success = this._fileManager.copyFile(sourceFile, targetFile);
             let targetFileInfo: FileInfo | undefined;

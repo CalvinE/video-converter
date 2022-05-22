@@ -340,6 +340,7 @@ const metaDataPath = join(".", "output");
 
     function getAllJobs(logger: ILogger, subCommand: SubCommand, items: FSItem[], options: AppOptions): JobsOptionsArray {
         logger.LogDebug("getting all files based on parameters", { targetFileNameRegex: options.targetFileNameRegex?.source, allowedFileExtensions: options.allowedFileExtensions })
+        // TODO: Remember what I was thinking here... Is it that if we are saving in place we should not need to copy anything?
         const allowCopy = !options.saveInPlace;
         const jobOptions: JobsOptionsArray = [];
         for (const item of items) {
