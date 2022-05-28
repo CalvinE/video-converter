@@ -11,6 +11,8 @@ const DEFAULT_GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
 const DEFAULT_FFMPEG_COMMAND = "ffmpeg";
 const DEFAULT_FFPROBE_COMMAND = "ffprobe";
 const DEFAULT_SAVE_PATH = join(".", "output", "video-converter-output");
+
+export type RunMode = "stand-alone" | "server" | "client";
 // const DEFAULT_FILES_TO_COPY: string[] = [".jpg", ".srt"];
 
 const SOURCE_PATH_OPTION_NAME = "sourcePath";
@@ -41,8 +43,10 @@ const DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME = "deleteFailedIntegrityCh
 const X_ARGS_OPTION_NAME = "xArgs";
 const FFMPEG_COMMAND_OPTION_NAME = "ffmpegCommand";
 const FFPROBE_COMMAND_OPTION_NAME = "ffprobeCommand";
-const SKIP_IF_VIDEO_CODEC_NAME_MATCH = "skipIfVideoCodecNameMatch";
+const SKIP_IF_VIDEO_CODEC_NAME_MATCH_OPTION_NAME = "skipIfVideoCodecNameMatch";
 const OPTIONS_FILE_OPTION_NAME = "optionsFile";
+const RUN_MODE_OPTION_NAME = "runMode";
+const METADATA_PATH_OPTION_NAME = "metadataPath";
 const HELP_OPTION_NAME = "help";
 
 export type AppOptions = {
@@ -74,8 +78,10 @@ export type AppOptions = {
     [X_ARGS_OPTION_NAME]: string[];
     [FFMPEG_COMMAND_OPTION_NAME]: string;
     [FFPROBE_COMMAND_OPTION_NAME]: string;
-    [SKIP_IF_VIDEO_CODEC_NAME_MATCH]: string[];
+    [SKIP_IF_VIDEO_CODEC_NAME_MATCH_OPTION_NAME]: string[];
     [OPTIONS_FILE_OPTION_NAME]: string | undefined;
+    [RUN_MODE_OPTION_NAME]: RunMode;
+    [METADATA_PATH_OPTION_NAME]: string;
     [HELP_OPTION_NAME]: boolean;
 }
 
@@ -108,6 +114,8 @@ export const defaultAppOptions: AppOptions = {
     optionsFile: undefined,
     ffmpegCommand: DEFAULT_FFMPEG_COMMAND,
     ffprobeCommand: DEFAULT_FFPROBE_COMMAND,
+    runMode: "stand-alone",
+    metadataPath: join(__dirname, "output"),
     help: false,
 };
 
@@ -231,8 +239,8 @@ export function ParseCLIOptions(): AppOptions {
             case DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME:
                 options[DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME] = true;
                 break;
-            case SKIP_IF_VIDEO_CODEC_NAME_MATCH:
-                options[SKIP_IF_VIDEO_CODEC_NAME_MATCH] = argv[++i].split(",").map(s => normalizeString(s));
+            case SKIP_IF_VIDEO_CODEC_NAME_MATCH_OPTION_NAME:
+                options[SKIP_IF_VIDEO_CODEC_NAME_MATCH_OPTION_NAME] = argv[++i].split(",").map(s => normalizeString(s));
                 break;
             // case CONCURRENT_JOBS_OPTION_NAME:
             //     // eslint-disable-next-line no-case-declarations
@@ -253,6 +261,12 @@ export function ParseCLIOptions(): AppOptions {
                     throw new Error(`options file specified does not exist: ${optionsFile}`);
                 }
                 optionsFileOptions = JSON.parse(readFileSync(optionsFile, { encoding: "utf8" })) as Partial<AppOptions>;
+                break;
+            case RUN_MODE_OPTION_NAME:
+                options[RUN_MODE_OPTION_NAME] = argv[++i] as RunMode;
+                break;
+            case METADATA_PATH_OPTION_NAME:
+                options[METADATA_PATH_OPTION_NAME] = argv[++i];
                 break;
             default:
                 // If we get here we did something wrong... print help and return?
@@ -382,7 +396,7 @@ export function PrintHelp() {
             description: `A flag. When present the source file for convert jobs will be deleted after successful conversion. This is required if ${SAVE_IN_PLACE_OPTION_NAME} is set and the new converted file will end up overwriting the original source file after conversion.`,
         },
         {
-            name: SKIP_IF_VIDEO_CODEC_NAME_MATCH,
+            name: SKIP_IF_VIDEO_CODEC_NAME_MATCH_OPTION_NAME,
             description: "Tells the converter to skip a video if its codec name lower cased matches a codec in this array. This parameter should be a comma separated list of codecs. All codes are normalized (lower cased and trimmed) For example: hevc,mpeg4",
         },
         {
@@ -392,6 +406,14 @@ export function PrintHelp() {
         {
             name: X_ARGS_OPTION_NAME,
             description: "Allows additional info to be passed in to FFMPEG or FFPROBE. Best to use once for each item to append to the command. Also supports a JSON array of strings.",
+        },
+        {
+            name: RUN_MODE_OPTION_NAME,
+            description: "TODO: Write me...",
+        },
+        {
+            name: METADATA_PATH_OPTION_NAME,
+            description: "TODO: Write me...",
         },
         {
             name: HELP_OPTION_NAME,
