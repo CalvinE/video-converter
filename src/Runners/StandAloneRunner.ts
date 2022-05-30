@@ -235,4 +235,9 @@ export class StandAloneRunner implements IRunner {
             await this._logger.shutdown();
         }
     }
+
+    stop(): Promise<void> {
+        // we dont really have anything to do here...
+        return Promise.resolve();
+    }
 }
