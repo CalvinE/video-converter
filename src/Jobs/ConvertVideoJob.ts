@@ -1,10 +1,9 @@
-import { ConvertVideoJobResult, getCommandID, VideoInfo, IntegrityCheckResult, CheckVideoIntegrityCommandResult, ConvertVideoCommandResult } from './../VideoConverter/models';
 import { FileInfo } from './../FileManager';
 import { FFMPEGVideoConverter } from './../VideoConverter/FFMPEG/FFMPEGVideoConverter';
 import { IFileManager } from '../FileManager';
 import { ILogger } from '../Logger';
 import { IOutputWriter } from '../OutputWriter';
-import { CommandStdErrMessageReceivedEventData, ConvertJobOptions, VideoConverterEventName_StdErrMessageReceived, VideoStreamInfo } from '../VideoConverter/models';
+import { ConvertVideoJobResult, getCommandID, VideoInfo, IntegrityCheckResult, CheckVideoIntegrityCommandResult, ConvertVideoCommandResult, GetVideoInfoCommandResult, CommandStdErrMessageReceivedEventData, ConvertJobOptions, VideoConverterEventName_StdErrMessageReceived, VideoStreamInfo } from '../VideoConverter/models';
 import { BaseJob } from "./BaseJob";
 import { bytesToHumanReadableBytes, HHMMSSmmToSeconds, millisecondsToHHMMSS } from '../PrettyPrint';
 
@@ -57,21 +56,12 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
         let targetVideoInfo: VideoInfo | undefined;
         let targetVideoIntegrityCheck: IntegrityCheckResult | undefined;
         let targetCheckVideoIntegrityResult: CheckVideoIntegrityCommandResult | undefined;
-        const sourceIntegrityCheckCommandID = getCommandID("checkvideointegrity");
-        this._logger.LogDebug("getting video file info so that we can calculate progressive updates", { commandID: sourceIntegrityCheckCommandID, })
-        const getSourceInfoFFMPEGCommand = new FFMPEGVideoConverter(this._logger, this._fileManager, this._jobOptions.baseCommand, this._jobOptions.getInfoCommand);
-        const sourceCheckVideoIntegrityCommandResult = await getSourceInfoFFMPEGCommand.checkVideoIntegrity(this._jobOptions.fileInfo, this._jobOptions.jobID, sourceIntegrityCheckCommandID, this._jobOptions.getVideoInfoCommandOptions)
-        if (sourceCheckVideoIntegrityCommandResult.success === false) {
-            const msg = "failed to get source video info";
-            failureReason = msg;
-            this._logger.LogWarn(msg, { videoInfoResult: sourceCheckVideoIntegrityCommandResult })
-            this._outputWriter.writeLine(msg);
-        } else if (sourceCheckVideoIntegrityCommandResult.integrityCheck.isVideoGood === false) {
-            const msg = "source video file failed integrity check. See log file for details";
-            failureReason = msg;
-            this._logger.LogWarn(msg, { videoInfoResult: sourceCheckVideoIntegrityCommandResult })
-            this._outputWriter.writeLine(msg);
-        }
+        this._logger.LogDebug("getting video file info so that we can calculate progressive updates", {});
+        const {
+            integrityCheckFailureReason: sourceIntegrityCheckFailureReason,
+            videoIntegrityCheckCommandResult: sourceCheckVideoIntegrityCommandResult
+        } = await this.checkVideoIntegrity(this._jobOptions.fileInfo, "", false)
+        failureReason = sourceIntegrityCheckFailureReason;
         if (failureReason === undefined) {
             sizeBeforeConvert = this._jobOptions.fileInfo.size;
             this._outputWriter.writeLine(`converting file: ${this._jobOptions.fileInfo.fullPath}`);
@@ -122,46 +112,26 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
                 }
             }
             if (failureReason === undefined) {
-                targetFileInfo = this._fileManager.getFSItemFromPath(this._jobOptions.commandOptions.targetFileFullPath ?? "") as FileInfo;
-                const targetFileVideoInfoCommand = new FFMPEGVideoConverter(this._logger, this._fileManager, this._jobOptions.baseCommand, this._jobOptions.getInfoCommand);
-                const targetIntegrityCheckCommandID = getCommandID("checkvideointegrity");
-                targetCheckVideoIntegrityResult = await targetFileVideoInfoCommand.checkVideoIntegrity(targetFileInfo, this._jobOptions.jobID, targetIntegrityCheckCommandID, this._jobOptions.getVideoInfoCommandOptions);
-                targetVideoInfo = targetCheckVideoIntegrityResult.videoInfo;
-                targetVideoIntegrityCheck = targetCheckVideoIntegrityResult.integrityCheck;
-                sizeAfterConvert = targetFileInfo.size;
-                if (targetCheckVideoIntegrityResult.success === false) {
-                    const msg = "failed to perform video integrity check converted file";
-                    this._logger.LogWarn(msg, { targetFileFullPath: this._jobOptions.commandOptions.targetFileFullPath });
-                    this._outputWriter.writeLine(msg);
-                    failureReason = msg;
-                } else if (targetCheckVideoIntegrityResult.integrityCheck.isVideoGood === false) {
-                    failureReason = "converted file failed integrity check";
-                    this._logger.LogWarn(failureReason, { targetCheckVideoIntegrityResult });
-                    this._outputWriter.writeLine(`${failureReason}: see logs for more details`)
-                    if (this._jobOptions.keepInvalidConvertResult === false) {
-                        const msg = "deleting invalid converted file per keepInvalidConvertResult being set to false";
-                        this._logger.LogWarn(msg, {
-                            invalidConvertedFile: targetFileInfo.fullPath,
-                        });
-                        this._outputWriter.writeLine(msg);
-                        // TODO: add property to file info to indicate a file as been deleted?
-                        const deleted = this._fileManager.safeUnlinkFile(targetFileInfo.fullPath);
-                        if (deleted === false) {
-                            const msg = "failed to delete invalid converted file";
-                            this._logger.LogWarn(msg, {
-                                invalidConvertedFile: targetFileInfo.fullPath,
-                            });
-                            this._outputWriter.writeLine(msg);
-                        }
-                    }
-                }
+                const {
+                    integrityCheckFailureReason: targetIntegrityCheckFailureReason,
+                    videoIntegrityCheckCommandResult: targetVideoIntegrityCheckCommandResult
+                } = await this.checkVideoIntegrity(null, this._jobOptions.commandOptions.targetFileFullPath, true);
+                failureReason = targetIntegrityCheckFailureReason;
+                sizeAfterConvert = targetVideoIntegrityCheckCommandResult.fileInfo.size;
+                targetCheckVideoIntegrityResult = targetVideoIntegrityCheckCommandResult;
+                targetFileInfo = targetVideoIntegrityCheckCommandResult.fileInfo;
+                targetVideoInfo = targetVideoIntegrityCheckCommandResult.videoInfo;
+                targetVideoIntegrityCheck = targetVideoIntegrityCheckCommandResult.integrityCheck;
             }
         }
         // write an empty line to advance the progressive update line
-        this._outputWriter.writeLine("");
         this.success = failureReason === undefined;
+        if (this.success === true && this._jobOptions.saveInPlace === true) {
+            // Hmm this is a conundrum... if I unlink the original and place the converted in its place with its name... do I need to recompute the file info and integrity check at this point too?
+        }
         const sizeDifference = this.success === true ? sizeAfterConvert - sizeBeforeConvert : 0;
         const durationMilliseconds = Date.now() - start;
+        this._outputWriter.writeLine("");
         return {
             jobID: this._jobOptions.jobID,
             success: this.success,
@@ -181,6 +151,51 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
             sourceCheckVideoIntegrityCommandResult: sourceCheckVideoIntegrityCommandResult.success === false ? sourceCheckVideoIntegrityCommandResult : undefined,
             convertCommandResult: convertCommandResult?.success === false ? convertCommandResult : undefined,
             targetCheckVideoIntegrityCommandResult: targetCheckVideoIntegrityResult?.success === false ? targetCheckVideoIntegrityResult : undefined,
+        };
+    }
+
+    private async checkVideoIntegrity(videoFileInfo: FileInfo | null, videoFileFullPath: string, isConvertedFile: boolean): Promise<{
+        integrityCheckFailureReason: string,
+        videoIntegrityCheckCommandResult: CheckVideoIntegrityCommandResult,
+        success: boolean,
+    }> {
+        let integrityCheckFailureReason = "";
+        const fileInfo = videoFileInfo !== null ? videoFileInfo : this._fileManager.getFSItemFromPath(videoFileFullPath) as FileInfo;
+        const videoIntegrityCheckCommand = new FFMPEGVideoConverter(this._logger, this._fileManager, this._jobOptions.baseCommand, this._jobOptions.getInfoCommand);
+        const targetIntegrityCheckCommandID = getCommandID("checkvideointegrity");
+        const videoIntegrityCheckCommandResult = await videoIntegrityCheckCommand.checkVideoIntegrity(fileInfo, this._jobOptions.jobID, targetIntegrityCheckCommandID, this._jobOptions.getVideoInfoCommandOptions);
+        if (videoIntegrityCheckCommandResult.success === false) {
+            integrityCheckFailureReason = "failed to perform video integrity check";
+            this._logger.LogWarn(integrityCheckFailureReason, { fullPath: fileInfo.fullPath });
+            this._outputWriter.writeLine(integrityCheckFailureReason);
+        } else if (videoIntegrityCheckCommandResult.integrityCheck.isVideoGood === false) {
+            integrityCheckFailureReason = "converted file failed integrity check";
+            this._logger.LogWarn(integrityCheckFailureReason, { videoIntegrityCheckResult: videoIntegrityCheckCommandResult });
+            this._outputWriter.writeLine(`${integrityCheckFailureReason}: see logs for more details`)
+            if (isConvertedFile === true && this._jobOptions.keepInvalidConvertResult === false) {
+                const msg = "deleting invalid converted file per keepInvalidConvertResult being set to false";
+                this._logger.LogWarn(msg, {
+                    invalidConvertedFile: fileInfo.fullPath,
+                    isConvertedFile,
+                    keepInvalidConvertResult: this._jobOptions.keepInvalidConvertResult,
+                });
+                this._outputWriter.writeLine(msg);
+                // TODO: add property to file info to indicate a file as been deleted?
+                const deleted = this._fileManager.safeUnlinkFile(fileInfo.fullPath);
+                if (deleted === false) {
+                    const msg = "failed to delete invalid converted file";
+                    this._logger.LogWarn(msg, {
+                        invalidConvertedFile: fileInfo.fullPath,
+                    });
+                    this._outputWriter.writeLine(msg);
+                }
+            }
+        }
+        const success = integrityCheckFailureReason === "" && videoIntegrityCheckCommandResult.success === true && videoIntegrityCheckCommandResult.integrityCheck.isVideoGood === true;
+        return {
+            integrityCheckFailureReason,
+            videoIntegrityCheckCommandResult,
+            success,
         };
     }
 

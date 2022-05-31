@@ -50,6 +50,7 @@ export class JobFactory {
             return {
                 baseCommand: appOptions.ffmpegCommand,
                 getInfoCommand: appOptions.ffprobeCommand,
+                saveInPlace: appOptions.saveInPlace,
                 jobID,
                 keepInvalidConvertResult: appOptions.keepInvalidConvertResult,
                 allowClobberExisting: appOptions.convertVideoAllowClobber,

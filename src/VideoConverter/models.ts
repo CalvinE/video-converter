@@ -86,6 +86,7 @@ export type VideoCommandJobOptions = BaseJobOptions & {
 
 export type ConvertJobOptions = VideoCommandJobOptions & {
   task: "convert";
+  saveInPlace: boolean;
   getInfoCommand: string;
   commandOptions: VideoConvertCommandOptions;
   keepInvalidConvertResult: boolean;
