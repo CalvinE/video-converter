@@ -45,7 +45,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
             }
         }
     }
-
+    // TODO: handle save in place job option. I.E. save to a temp file and after conversion and integrity check unlink previous file and rename the converted temp file with the right name.
     protected async _execute(): Promise<ConvertVideoJobResult> {
         const start = Date.now();
         let sizeBeforeConvert = 0;

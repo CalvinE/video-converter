@@ -16,6 +16,7 @@ import {
     mkdirSync,
     readdirSync,
     readFileSync,
+    renameSync,
     unlinkSync,
     writeFileSync
 } from 'fs';
@@ -67,6 +68,10 @@ export interface IFileManager {
 
     unlinkFile: (targetFileFullPath: string) => boolean;
 
+    renameFile: (oldFilePath: string, newFilePath: string) => void;
+
+    safeRenameFile: (oldFilePath: string, newFilePath: string) => boolean;
+
     exists: (path: string) => boolean;
 }
 
@@ -103,6 +108,18 @@ export class FileManager implements IFileManager {
 
     constructor(logger: ILogger) {
         this._logger = logger;
+    }
+    public renameFile(oldFilePath: string, newFilePath: string): void {
+        renameSync(oldFilePath, newFilePath);
+    }
+
+    public safeRenameFile(oldFilePath: string, newFilePath: string): boolean {
+        try {
+            this.renameFile(oldFilePath, newFilePath);
+        } catch (err) {
+            return false;
+        }
+        return true;
     }
 
     public exists(path: string): boolean {
