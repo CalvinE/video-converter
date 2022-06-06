@@ -87,13 +87,15 @@ export type VideoCommandJobOptions = BaseJobOptions & {
 export type ConvertJobOptions = VideoCommandJobOptions & {
   task: "convert";
   saveInPlace: boolean;
+  deleteSourceAfterConvert: boolean;
   getInfoCommand: string;
   commandOptions: VideoConvertCommandOptions;
   keepInvalidConvertResult: boolean;
   allowClobberExisting: boolean;
   skipConvertExisting: boolean;
+  skipVideoCodecName: string;
   // This is used for both the source info and target info calls. its mainly to pass the timeout to each for this command...
-  getVideoInfoCommandOptions: GetVideoInfoCommandOptions;
+  checkVideoIntegrityCommandOptions: CheckVideoIntegrityCommandOptions;
   result?: ConvertVideoJobResult;
 }
 
@@ -150,7 +152,9 @@ export type ConvertVideoJobResult = BaseJobResult & {
   // Only populated when the command fails (not if the file is not valid, but the command fails)
   targetCheckVideoIntegrityCommandResult?: OmittedCheckVideoIntegrityCommandResult;
   // Only populated when the command fails
-  convertCommandResult?: OmittedConvertVideoCommandResult
+  convertCommandResult?: OmittedConvertVideoCommandResult;
+  skipped: boolean;
+  skippedReason?: string;
 }
 
 export type GetVideoInfoJobResult = BaseJobResult & {
@@ -284,6 +288,10 @@ export interface IVideoConverter {
   getVideoInfo: (sourceFile: FileInfo, jobID: string, commandID: string, options: GetVideoInfoCommandOptions) => Promise<GetVideoInfoCommandResult>;
   convertVideo: (sourceFile: FileInfo, jobID: string, commandID: string, options: VideoConvertCommandOptions) => Promise<ConvertVideoCommandResult>;
   checkVideoIntegrity: (sourceFile: FileInfo, jobID: string, commandID: string, options: CheckVideoIntegrityCommandOptions) => Promise<CheckVideoIntegrityCommandResult>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  on: (eventName: string | symbol, listener: (...args: any[]) => void) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  off: (eventName: string | symbol, listener: (...args: any[]) => void) => void;
 }
 
 // It is very important that all commands run have a unique id.

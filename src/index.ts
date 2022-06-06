@@ -184,8 +184,11 @@ const metaDataPath = join(".", "output");
             appLogger.LogInfo("starting job", { jobID: jobOptions.jobID });
             appOutputWriter.writeLine("");
             appOutputWriter.writeLine(`starting job ${i} of ${numJobs} ${jobOptions.jobID} - ${jobOptions.task}`);
-            const job = JobFactory.MakeJob(appLogger, appOutputWriter, fileManager, jobOptions);
+            const job = JobFactory.makeJob(appLogger, appOutputWriter, fileManager, jobOptions);
             if (jobOptions.state === "running" || jobOptions.state === "error") {
+                // TODO: potential issue here... we need to make sure that the if the source and target are the same file we do not delete the source?
+                // one potential solution would be to set the target file full path to the __VCTMP__ prefixed file and just rename and move in the code later...
+                // only if the two source and target file full path are identical...
                 // a job was started, so we need to clean up the what files may have been created
                 appLogger.LogInfo(`job was interrupted or encountered an error attempting to restart job`, { job: jobOptions });
                 appOutputWriter.writeLine(`job was interrupted or encountered an error attempting to restart job`);

@@ -3,11 +3,14 @@ import { argv, stdout } from "process";
 import { EOL } from "os";
 import { dateToFileSafeDate } from './PrettyPrint';
 import { join } from 'path';
+import { normalizeString } from './util';
+import { existsSync, readFileSync } from 'fs';
 
 const DEFAULT_APPROVED_FILE_EXTENSIONS: string[] = [".mp4", ".mkv", ".avi", ".mov"];
 const DEFAULT_GET_INFO_COMMAND_TIMEOUT_MILLISECONDS = 10000;
 const DEFAULT_FFMPEG_COMMAND = "ffmpeg";
 const DEFAULT_FFPROBE_COMMAND = "ffprobe";
+const DEFAULT_SAVE_PATH = join(".", "output", "video-converter-output");
 // const DEFAULT_FILES_TO_COPY: string[] = [".jpg", ".srt"];
 
 const SOURCE_PATH_OPTION_NAME = "sourcePath";
@@ -21,7 +24,7 @@ const TARGET_VIDEO_ENCODER_PATH_OPTION_NAME = "targetVideoEncoder";
 const TARGET_FILE_NAME_REGEX_OPTION_NAME = "targetFileNameRegex";
 const SAVE_PATH_OPTION_NAME = "savePath";
 const COPY_RELATIVE_FOLDER_PATHS = "copyRelativeFolderPath";
-const SAVE_IN_PLACE = "saveInPlace"; // If this is set to true we need to add it to the convert job options. The file will need to be converted with a temp random name and then once done and the integrity check passes unlink the old one and rename the temp to the old name...
+const SAVE_IN_PLACE_OPTION_NAME = "saveInPlace"; // If this is set to true we need to add it to the convert job options. The file will need to be converted with a temp random name and then once done and the integrity check passes unlink the old one and rename the temp to the old name...
 const GET_INFO_OPTION_NAME = "getInfo";
 const GET_VIDEO_INFO_TIMEOUT_MILLISECONDS_OPTIONS_NAME = "getVideoInfoTimeoutMilliseconds";
 const CONVERT_VIDEO_OPTION_NAME = "convertVideo";
@@ -31,12 +34,15 @@ const CONVERT_VIDEO_SKIP_CONVERT_EXISTING_OPTION_NAME = "convertVideoSkipConvert
 const CHECK_VIDEO_INTEGRITY_OPTION_NAME = "checkVideoIntegrity"
 const SAVE_JOB_FILE_ONLY_OPTION_NAME = "saveJobFileOnly";
 const JOB_FILE_PATH_OPTION_NAME = "jobFile";
-const CONCURRENT_JOBS_OPTION_NAME = "concurrentJobs";
-const KEEP_FAILED_INTEGRITY_CONVERTED = "keepInvalidConvertResult";
-const DELETE_FAILED_INTEGRITY_CHECK_FILES = "deleteFailedIntegrityCheckFiles";
+// const CONCURRENT_JOBS_OPTION_NAME = "concurrentJobs";
+const DELETE_SOURCE_AFTER_CONVERT_OPTION_NAME = "deleteSourceAfterConvert"
+const KEEP_FAILED_INTEGRITY_CONVERTED_OPTION_NAME = "keepInvalidConvertResult";
+const DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME = "deleteFailedIntegrityCheckFiles";
 const X_ARGS_OPTION_NAME = "xArgs"
 const FFMPEG_COMMAND_OPTION_NAME = "ffmpegCommand";
 const FFPROBE_COMMAND_OPTION_NAME = "ffprobeCommand";
+const SKIP_IF_VIDEO_CODEC_NAME_MATCH = "skipIfVideoCodecNameMatch";
+const OPTIONS_FILE_OPTION_NAME = "optionsFile";
 const HELP_OPTION_NAME = "help";
 
 export type AppOptions = {
@@ -51,7 +57,7 @@ export type AppOptions = {
     [TARGET_FILE_NAME_REGEX_OPTION_NAME]?: RegExp;
     [SAVE_PATH_OPTION_NAME]: string;
     [COPY_RELATIVE_FOLDER_PATHS]: boolean;
-    [SAVE_IN_PLACE]: boolean;
+    [SAVE_IN_PLACE_OPTION_NAME]: boolean;
     [GET_INFO_OPTION_NAME]: boolean;
     [GET_VIDEO_INFO_TIMEOUT_MILLISECONDS_OPTIONS_NAME]: number;
     [CONVERT_VIDEO_OPTION_NAME]: boolean;
@@ -61,13 +67,48 @@ export type AppOptions = {
     [CHECK_VIDEO_INTEGRITY_OPTION_NAME]: boolean;
     [SAVE_JOB_FILE_ONLY_OPTION_NAME]: boolean;
     [JOB_FILE_PATH_OPTION_NAME]: string;
-    [CONCURRENT_JOBS_OPTION_NAME]: number;
-    [KEEP_FAILED_INTEGRITY_CONVERTED]: boolean;
-    [DELETE_FAILED_INTEGRITY_CHECK_FILES]: boolean;
+    // [CONCURRENT_JOBS_OPTION_NAME]: number;
+    [DELETE_SOURCE_AFTER_CONVERT_OPTION_NAME]: boolean;
+    [KEEP_FAILED_INTEGRITY_CONVERTED_OPTION_NAME]: boolean;
+    [DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME]: boolean;
     [X_ARGS_OPTION_NAME]: string[];
     [FFMPEG_COMMAND_OPTION_NAME]: string;
     [FFPROBE_COMMAND_OPTION_NAME]: string;
+    [SKIP_IF_VIDEO_CODEC_NAME_MATCH]: string;
+    [OPTIONS_FILE_OPTION_NAME]: string | undefined;
     [HELP_OPTION_NAME]: boolean;
+}
+
+export const defaultAppOptions: AppOptions = {
+    sourcePath: "",
+    useCuda: false,
+    fileCopyExtensions: [],
+    allowedFileExtensions: DEFAULT_APPROVED_FILE_EXTENSIONS,
+    targetContainerFormat: "copy",
+    targetAudioEncoder: "copy",
+    targetVideoEncoder: "copy",
+    savePath: DEFAULT_SAVE_PATH,
+    saveInPlace: false,
+    copyRelativeFolderPath: false,
+    getInfo: false,
+    getVideoInfoTimeoutMilliseconds: DEFAULT_GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
+    convertVideo: false,
+    convertVideoTimeoutMilliseconds: 0,
+    convertVideoAllowClobber: false,
+    convertVideoSkipConvertExisting: false,
+    checkVideoIntegrity: false,
+    saveJobFileOnly: false,
+    jobFile: join(".", "output", "jobs", `${dateToFileSafeDate(new Date())}-video-converter-job.json`),
+    // concurrentJobs: 1,
+    deleteSourceAfterConvert: false,
+    keepInvalidConvertResult: false,
+    deleteFailedIntegrityCheckFiles: false,
+    xArgs: [],
+    skipIfVideoCodecNameMatch: "",
+    optionsFile: undefined,
+    ffmpegCommand: DEFAULT_FFMPEG_COMMAND,
+    ffprobeCommand: DEFAULT_FFPROBE_COMMAND,
+    help: false,
 }
 
 function safeQuoteXArg(arg: string): string {
@@ -81,34 +122,9 @@ function safeQuoteXArg(arg: string): string {
 // cmd options are passed with preceding 2 dahses EX: --help
 export function ParseOptions(): AppOptions {
     // Initialize with defaults
-    const options: AppOptions = {
-        sourcePath: "",
-        useCuda: false,
-        fileCopyExtensions: [],
-        allowedFileExtensions: DEFAULT_APPROVED_FILE_EXTENSIONS,
-        targetContainerFormat: "copy",
-        targetAudioEncoder: "copy",
-        targetVideoEncoder: "copy",
-        savePath: join(".", "output", "video-converter-output"),
-        saveInPlace: false,
-        copyRelativeFolderPath: false,
-        getInfo: false,
-        getVideoInfoTimeoutMilliseconds: DEFAULT_GET_INFO_COMMAND_TIMEOUT_MILLISECONDS,
-        convertVideo: false,
-        convertVideoTimeoutMilliseconds: 0,
-        convertVideoAllowClobber: false,
-        convertVideoSkipConvertExisting: false,
-        checkVideoIntegrity: false,
-        saveJobFileOnly: false,
-        jobFile: join(".", "output", "jobs", `${dateToFileSafeDate(new Date())}-video-converter-job.json`),
-        concurrentJobs: 1,
-        keepInvalidConvertResult: false,
-        deleteFailedIntegrityCheckFiles: false,
-        xArgs: [],
-        ffmpegCommand: DEFAULT_FFMPEG_COMMAND,
-        ffprobeCommand: DEFAULT_FFPROBE_COMMAND,
-        help: false,
-    };
+    let optionsFileOptions: Partial<AppOptions> = {};
+    let optionsFile: string;
+    const options: AppOptions = defaultAppOptions;
     for (let i = 2; i < argv.length; i++) {
         const currentArg = argv[i];
         if (!currentArg?.startsWith("--")) {
@@ -194,8 +210,8 @@ export function ParseOptions(): AppOptions {
             case SAVE_PATH_OPTION_NAME:
                 options[SAVE_PATH_OPTION_NAME] = argv[++i];
                 break;
-            case SAVE_IN_PLACE:
-                options[SAVE_IN_PLACE] = true;
+            case SAVE_IN_PLACE_OPTION_NAME:
+                options[SAVE_IN_PLACE_OPTION_NAME] = true;
                 break;
             case COPY_RELATIVE_FOLDER_PATHS:
                 options[COPY_RELATIVE_FOLDER_PATHS] = true;
@@ -221,21 +237,34 @@ export function ParseOptions(): AppOptions {
             case JOB_FILE_PATH_OPTION_NAME:
                 options[JOB_FILE_PATH_OPTION_NAME] = argv[++i];
                 break;
-            case KEEP_FAILED_INTEGRITY_CONVERTED:
-                options[KEEP_FAILED_INTEGRITY_CONVERTED] = true;
+            case KEEP_FAILED_INTEGRITY_CONVERTED_OPTION_NAME:
+                options[KEEP_FAILED_INTEGRITY_CONVERTED_OPTION_NAME] = true;
                 break;
-            case DELETE_FAILED_INTEGRITY_CHECK_FILES:
-                options[DELETE_FAILED_INTEGRITY_CHECK_FILES] = true;
+            case DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME:
+                options[DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME] = true;
                 break;
-            case CONCURRENT_JOBS_OPTION_NAME:
-                // eslint-disable-next-line no-case-declarations
-                const concurrentJobsString = argv[++i];
-                // eslint-disable-next-line no-case-declarations
-                const concurrentJobsNumber = parseInt(concurrentJobsString, 10);
-                if (isNaN(concurrentJobsNumber) || concurrentJobsNumber <= 0) {
-                    throw new Error(`${CONCURRENT_JOBS_OPTION_NAME} options was not a valid positive number greater than zero: ${concurrentJobsString}`);
+            case SKIP_IF_VIDEO_CODEC_NAME_MATCH:
+                options[SKIP_IF_VIDEO_CODEC_NAME_MATCH] = normalizeString(argv[++i]);
+                break;
+            // case CONCURRENT_JOBS_OPTION_NAME:
+            //     // eslint-disable-next-line no-case-declarations
+            //     const concurrentJobsString = argv[++i];
+            //     // eslint-disable-next-line no-case-declarations
+            //     const concurrentJobsNumber = parseInt(concurrentJobsString, 10);
+            //     if (isNaN(concurrentJobsNumber) || concurrentJobsNumber <= 0) {
+            //         throw new Error(`${CONCURRENT_JOBS_OPTION_NAME} options was not a valid positive number greater than zero: ${concurrentJobsString}`);
+            //     }
+            //     options[CONCURRENT_JOBS_OPTION_NAME] = concurrentJobsNumber;
+            //     break;
+            case DELETE_SOURCE_AFTER_CONVERT_OPTION_NAME:
+                options[DELETE_SOURCE_AFTER_CONVERT_OPTION_NAME] = true;
+                break;
+            case OPTIONS_FILE_OPTION_NAME:
+                optionsFile = argv[++i];
+                if (!existsSync(optionsFile)) {
+                    throw new Error(`options file specified does not exist: ${optionsFile}`);
                 }
-                options[CONCURRENT_JOBS_OPTION_NAME] = concurrentJobsNumber;
+                optionsFileOptions = JSON.parse(readFileSync(optionsFile, { encoding: "utf8" })) as Partial<AppOptions>;
                 break;
             default:
                 // If we get here we did something wrong... print help and return?
@@ -248,7 +277,10 @@ export function ParseOptions(): AppOptions {
         }
 
     }
-    return options;
+    return {
+        ...optionsFileOptions,
+        ...options
+    };
 }
 
 export function PrintHelp() {
@@ -302,7 +334,7 @@ export function PrintHelp() {
                 description: "A flag. When present will duplicate the folder structure after --sourcePath in the --savePath",
             },
             {
-                name: SAVE_IN_PLACE,
+                name: SAVE_IN_PLACE_OPTION_NAME,
                 description: "A flag. When present converted video files will be placed in the same directory where the video to be converted is located.",
             },
             {
@@ -334,16 +366,28 @@ export function PrintHelp() {
                 description: `A path to a json job file. if none is provided a default will be generated. If the file provided does not exist it will be created and populated based on the other options provided.`,
             },
             {
-                name: KEEP_FAILED_INTEGRITY_CONVERTED,
+                name: KEEP_FAILED_INTEGRITY_CONVERTED_OPTION_NAME,
                 description: `A flag. When present in a convert job it will keep converted files that fail the video integrity check. By default they are deleted.`,
             },
             {
-                name: DELETE_FAILED_INTEGRITY_CHECK_FILES,
+                name: DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME,
                 description: `A flag. When present in a check integrity job it will delete files that fail the video integrity check. By default they are not deleted.`,
             },
+            // {
+            //     name: CONCURRENT_JOBS_OPTION_NAME,
+            //     description: "(NOT IMPLEMENTED YET) A number representing how may jobs the should be processed at one time. Defaults to 1.",
+            // },
             {
-                name: CONCURRENT_JOBS_OPTION_NAME,
-                description: "(NOT IMPLEMENTED YET) A number representing how may jobs the should be processed at one time. Defaults to 1.",
+                name: DELETE_SOURCE_AFTER_CONVERT_OPTION_NAME,
+                description: "A flag. When present the source file for convert jobs will be deleted after successful conversion.",
+            },
+            {
+                name: SKIP_IF_VIDEO_CODEC_NAME_MATCH,
+                description: "Tells the converter to skip a video if its codec name matches this parameter. For example: hevc to skip file already converted to H.265",
+            },
+            {
+                name: OPTIONS_FILE_OPTION_NAME,
+                description: "A path to a JSON file containing options for the video converter. These options are overridden by addition options passed in normally.",
             },
             {
                 name: X_ARGS_OPTION_NAME,

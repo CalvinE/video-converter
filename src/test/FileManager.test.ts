@@ -30,7 +30,7 @@ describe('FileManager tests', () => {
                 assert.isTrue(false, "first item in dirContents should be a file with a .txt extension")
             }
         });
-        it('Should enumerate a directory recursivly when max recursion level is 1 or greater', () => {
+        it('Should enumerate a directory recursively when max recursion level is 1 or greater', () => {
             const dirContents = fileManager.enumerateDirectory(testFolderPath, 99)
             assert.equal(dirContents.length, 2)
             if (dirContents[0].type === 'directory') {

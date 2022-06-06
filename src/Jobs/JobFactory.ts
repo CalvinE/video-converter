@@ -1,5 +1,5 @@
 import { CheckVideoIntegrityJob, CHECK_VIDEO_INTEGRITY_JOB_NAME } from './CheckVideoIntegrityJob';
-import { CopyJobOptions, GetInfoJobOptions, ConvertJobOptions, CheckVideoIntegrityJobOptions, Task, JobOptions, getJobID, VideoConvertCommandOptions, GetVideoInfoCommandOptions } from './../VideoConverter/models';
+import { CopyJobOptions, GetInfoJobOptions, ConvertJobOptions, CheckVideoIntegrityJobOptions, Task, JobOptions, getJobID, VideoConvertCommandOptions, GetVideoInfoCommandOptions, CheckVideoIntegrityCommandOptions } from './../VideoConverter/models';
 import { FileInfo, IFileManager } from '../FileManager';
 import { ILogger } from '../Logger';
 import { IOutputWriter } from '../OutputWriter';
@@ -10,11 +10,23 @@ import { GetVideoInfoJob, GET_VIDEO_INFO_JOB_NAME } from './GetVideoInfoJob';
 import { AppOptions } from '../OptionsParser';
 import { join, resolve } from 'path';
 
+/**
+ * This token is prepended on file names at job creation time when a source and target file for conversion are the same (full path and file name). This is automatically removed from the file name when the conversion is complete and will overwrite the original if it is still in place post conversion.
+ */
+export const TEMP_FILE_PREFIX = ")_-_-VCTMP-_-_(";
+
+export class SourceTargetCollisionError extends Error {
+    constructor() {
+        super();
+        this.message = "source and target for job are the same and settings are such that it is not allowed";
+    }
+}
+
 type Job = CopyJob | ConvertVideoJob | GetVideoInfoJob | CheckVideoIntegrityJob;
 
 // FIXME: make this work from an object for key to job constructors. add ability to register new jobs at run time?
 export class JobFactory {
-    public static MakeJob(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, options: BaseJobOptions): Job {
+    public static makeJob(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, options: BaseJobOptions): Job {
         switch (options.task) {
             case "copy":
                 return new CopyJob(logger, outputWriter, fileManager, options as CopyJobOptions);
@@ -43,7 +55,7 @@ export class JobFactory {
                 targetFileFullPath: targetFileFullPath,
                 xArgs: appOptions.xArgs,
             };
-            const getVideoInfoCommandOptions: GetVideoInfoCommandOptions = {
+            const getVideoInfoCommandOptions: CheckVideoIntegrityCommandOptions = {
                 timeoutMilliseconds: appOptions.getVideoInfoTimeoutMilliseconds,
                 xArgs: [],
             };
@@ -51,6 +63,7 @@ export class JobFactory {
                 baseCommand: appOptions.ffmpegCommand,
                 getInfoCommand: appOptions.ffprobeCommand,
                 saveInPlace: appOptions.saveInPlace,
+                deleteSourceAfterConvert: appOptions.deleteSourceAfterConvert,
                 jobID,
                 keepInvalidConvertResult: appOptions.keepInvalidConvertResult,
                 allowClobberExisting: appOptions.convertVideoAllowClobber,
@@ -60,7 +73,7 @@ export class JobFactory {
                 state: "pending",
                 task: "convert",
                 commandOptions: videoConvertOptions,
-                getVideoInfoCommandOptions,
+                checkVideoIntegrityCommandOptions: getVideoInfoCommandOptions,
             } as ConvertJobOptions;
         } else if (task === "getinfo") {
             const jobID = getJobID(GET_VIDEO_INFO_JOB_NAME);
@@ -120,8 +133,8 @@ export class JobFactory {
         let absoluteParentPath: string;
         logger.LogVerbose("attempting to build target file full path", { source: sourceFile, options });
         if (options.saveInPlace) {
-            absoluteParentPath = sourceFile.fullPath;
-            logger.LogDebug("save in place options set. using source file full path", { sourceFileFullPath: sourceFile.fullPath });
+            absoluteParentPath = sourceFile.pathToItem;
+            logger.LogDebug("save in place options set. using source file path", { sourceFileFullPath: sourceFile.fullPath });
         } else if (options.copyRelativeFolderPath) {
             const fullRelativePath = join(options.savePath, sourceFile.relativePath);
             absoluteParentPath = resolve(fullRelativePath);
@@ -145,7 +158,18 @@ export class JobFactory {
             logger.LogDebug("using option target container format on file name", { targetFileName: targetFileName, targetContainerFormat: options.targetContainerFormat });
         }
 
-        const targetFileFullPath = join(absoluteParentPath, targetFileName);
+        let targetFileFullPath = join(absoluteParentPath, targetFileName);
+
+        if (targetFileFullPath === sourceFile.fullPath) {
+            if (options.saveInPlace && options.deleteSourceAfterConvert) {
+                targetFileFullPath = join(absoluteParentPath, `${TEMP_FILE_PREFIX}${targetFileName}`);
+            } else {
+                const err = new SourceTargetCollisionError();
+                logger.LogError("cannot proceed source and target path are identical and based on settings that is not allowed...", err, { path: targetFileName })
+                throw err;
+            }
+        }
+
         logger.LogDebug("target file location built", { sourceFile, absoluteParentPath, targetFileFullPath: targetFileName, });
         return {
             absoluteParentPath,

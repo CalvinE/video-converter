@@ -57,7 +57,6 @@ export interface IFileManager {
 
     getFSItemFromPath: (itemPath: string) => FSItem
 
-    // TODO: need to make a proper result for the return value.
     copyFile: (sourceFileFullPath: string, targetPath: string) => boolean;
 
     readFile: (sourceFilePath: string) => string;
@@ -73,6 +72,8 @@ export interface IFileManager {
     safeRenameFile: (oldFilePath: string, newFilePath: string) => boolean;
 
     exists: (path: string) => boolean;
+
+    joinPath: (...pathParts: string[]) => string;
 }
 
 class ErrorDirectoryDoesNotExist extends Error {
@@ -272,5 +273,9 @@ export class FileManager implements IFileManager {
             relativePath: dirname(relative(basePath, itemPath)),
         }
         return baseFSItem;
+    }
+
+    public joinPath(...pathParts: string[]): string {
+        return join(...pathParts);
     }
 }
