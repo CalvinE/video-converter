@@ -23,7 +23,7 @@ describe('JobFactory', () => {
             "extension": ".avi"
         };
         tempTargetFileFullPath = `X:\\video\\TV_Series\\Alfred Hitchcock Presents\\Alfred Hitchcock Presents Season 1\\${TEMP_FILE_PREFIX}Alfred.Hitchcock.Presents.S01E01.avi`;
-    })
+    });
     describe('makeJobOptions - convert', () => {
         it('job id should start with convert video identifier', () => {
             const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
@@ -84,42 +84,42 @@ describe('JobFactory', () => {
                 ...defaultAppOptions,
                 ffmpegCommand: "ffmpeg",
             }) as ConvertJobOptions;
-            assert.equal(options.baseCommand, "ffmpeg")
+            assert.equal(options.baseCommand, "ffmpeg");
         });
         it('when ffprobeCommand is set the getInfoCommand convert job options will be set appropriately', () => {
             const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
                 ...defaultAppOptions,
                 ffprobeCommand: "ffprobe",
             }) as ConvertJobOptions;
-            assert.equal(options.getInfoCommand, "ffprobe")
+            assert.equal(options.getInfoCommand, "ffprobe");
         });
         it('when deleteSourceAfterConvert is set the deleteSourceAfterConvert convert job options will be set appropriately', () => {
             const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
                 ...defaultAppOptions,
                 deleteSourceAfterConvert: true,
             }) as ConvertJobOptions;
-            assert.equal(options.deleteSourceAfterConvert, true)
+            assert.equal(options.deleteSourceAfterConvert, true);
         });
         it('when keepInvalidConvertResult is set the keepInvalidConvertResult convert job options will be set appropriately', () => {
             const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
                 ...defaultAppOptions,
                 keepInvalidConvertResult: true,
             }) as ConvertJobOptions;
-            assert.equal(options.keepInvalidConvertResult, true)
+            assert.equal(options.keepInvalidConvertResult, true);
         });
         it('when convertVideoAllowClobber is set the allowClobberExisting convert job options will be set appropriately', () => {
             const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
                 ...defaultAppOptions,
                 convertVideoAllowClobber: true,
             }) as ConvertJobOptions;
-            assert.equal(options.allowClobberExisting, true)
+            assert.equal(options.allowClobberExisting, true);
         });
         it('when convertVideoSkipConvertExisting is set the skipConvertExisting convert job options will be set appropriately', () => {
             const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
                 ...defaultAppOptions,
                 convertVideoSkipConvertExisting: true,
             }) as ConvertJobOptions;
-            assert.equal(options.skipConvertExisting, true)
+            assert.equal(options.skipConvertExisting, true);
         });
         it('when skipIfVideoCodecNameMatch is set the ConvertJobOptions; convert job options will be set appropriately', () => {
             const codecsToSkip = ["hevc"];
@@ -127,7 +127,7 @@ describe('JobFactory', () => {
                 ...defaultAppOptions,
                 skipIfVideoCodecNameMatch: codecsToSkip,
             }) as ConvertJobOptions;
-            assert.equal(options.skipVideoCodecName, codecsToSkip)
+            assert.equal(options.skipVideoCodecName, codecsToSkip);
         });
     });
 });

@@ -360,7 +360,7 @@ describe('ConvertVideoJob', () => {
     it('source and target files being the same results in a failure and only the source file remains', async () => {
         const convertJobOptions: ConvertJobOptions = {
             ...defaultConvertJobOptions
-        }
+        };
         convertJobOptions.commandOptions.targetFileFullPath = sourceFile.fullPath;
         const convertJob = JobFactory.makeJob(logger, outputWriter, fileManager, convertJobOptions);
         const result = await convertJob.execute();
@@ -373,7 +373,7 @@ describe('ConvertVideoJob', () => {
     it('non conflicting source and target files result in two separate files', async () => {
         const convertJobOptions: ConvertJobOptions = {
             ...defaultConvertJobOptions
-        }
+        };
         convertJobOptions.commandOptions.targetFileFullPath = otherTargetFileFullPath;
         const convertJob = JobFactory.makeJob(logger, outputWriter, fileManager, convertJobOptions);
         const result: ConvertVideoJobResult = await convertJob.execute() as ConvertVideoJobResult;
@@ -382,7 +382,7 @@ describe('ConvertVideoJob', () => {
         const fsContents = fileManager.enumerateDirectory("", 0);
         assert.equal(fsContents.length, 2);
         const fsSourceFile = fsContents.find(f => f.fullPath === sourceFile.fullPath);
-        assert.exists(fsSourceFile)
+        assert.exists(fsSourceFile);
         const fsTargetFile = fsContents.find(f => f.fullPath === otherTargetFileFullPath);
         assert.exists(fsTargetFile);
     });
@@ -390,7 +390,7 @@ describe('ConvertVideoJob', () => {
         const convertJobOptions: ConvertJobOptions = {
             ...defaultConvertJobOptions,
             deleteSourceAfterConvert: true
-        }
+        };
         convertJobOptions.commandOptions.targetFileFullPath = otherTargetFileFullPath;
         const convertJob = JobFactory.makeJob(logger, outputWriter, fileManager, convertJobOptions);
         const result: ConvertVideoJobResult = await convertJob.execute() as ConvertVideoJobResult;
@@ -404,7 +404,7 @@ describe('ConvertVideoJob', () => {
     it('source file failed integrity check results failed job', async () => {
         const convertJobOptions: ConvertJobOptions = {
             ...defaultConvertJobOptions
-        }
+        };
         convertJobOptions.commandOptions.targetFileFullPath = otherTargetFileFullPath;
         convertJobOptions.mockData = {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -418,14 +418,14 @@ describe('ConvertVideoJob', () => {
         const fsContents = fileManager.enumerateDirectory("", 0);
         assert.equal(fsContents.length, 1);
         const fsSourceFile = fsContents.find(f => f.fullPath === sourceFile.fullPath);
-        assert.exists(fsSourceFile)
+        assert.exists(fsSourceFile);
         const fsTargetFile = fsContents.find(f => f.fullPath === otherTargetFileFullPath);
         assert.notExists(fsTargetFile);
     });
     it('converted file failed integrity check results in invalid converted file being deleted', async () => {
         const convertJobOptions: ConvertJobOptions = {
             ...defaultConvertJobOptions
-        }
+        };
         convertJobOptions.commandOptions.targetFileFullPath = otherTargetFileFullPath;
         convertJobOptions.mockData = {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -439,7 +439,7 @@ describe('ConvertVideoJob', () => {
         const fsContents = fileManager.enumerateDirectory("", 0);
         assert.equal(fsContents.length, 1);
         const fsSourceFile = fsContents.find(f => f.fullPath === sourceFile.fullPath);
-        assert.exists(fsSourceFile)
+        assert.exists(fsSourceFile);
         const fsTargetFile = fsContents.find(f => f.fullPath === otherTargetFileFullPath);
         assert.notExists(fsTargetFile);
     });
@@ -447,7 +447,7 @@ describe('ConvertVideoJob', () => {
         const convertJobOptions: ConvertJobOptions = {
             ...defaultConvertJobOptions,
             keepInvalidConvertResult: true,
-        }
+        };
         convertJobOptions.commandOptions.targetFileFullPath = otherTargetFileFullPath;
         convertJobOptions.mockData = {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -461,14 +461,14 @@ describe('ConvertVideoJob', () => {
         const fsContents = fileManager.enumerateDirectory("", 0);
         assert.equal(fsContents.length, 2);
         const fsSourceFile = fsContents.find(f => f.fullPath === sourceFile.fullPath);
-        assert.exists(fsSourceFile)
+        assert.exists(fsSourceFile);
         const fsTargetFile = fsContents.find(f => f.fullPath === otherTargetFileFullPath);
         assert.exists(fsTargetFile);
     });
     it('target file full path that has TEMP token in file name and otherwise is identical to the source file full path will overwrite the original', async () => {
         const convertJobOptions: ConvertJobOptions = {
             ...defaultConvertJobOptions
-        }
+        };
         convertJobOptions.commandOptions.targetFileFullPath = tempTargetFileFullPath;
         const convertJob = JobFactory.makeJob(logger, outputWriter, fileManager, convertJobOptions);
         const result: ConvertVideoJobResult = await convertJob.execute() as ConvertVideoJobResult;
@@ -476,13 +476,13 @@ describe('ConvertVideoJob', () => {
         assert.isTrue(result.success);
         const fsContents = fileManager.enumerateDirectory("", 0);
         assert.equal(fsContents.length, 1);
-        assert.equal(fsContents[0].fullPath, removedTempTargetFileFullPath)
+        assert.equal(fsContents[0].fullPath, removedTempTargetFileFullPath);
     });
     it('deleteSourceAfterConvert set to true target file full path that has TEMP token in file name and otherwise is identical to the source file full path will overwrite the original', async () => {
         const convertJobOptions: ConvertJobOptions = {
             ...defaultConvertJobOptions,
             deleteSourceAfterConvert: true,
-        }
+        };
         convertJobOptions.commandOptions.targetFileFullPath = tempTargetFileFullPath;
         const convertJob = JobFactory.makeJob(logger, outputWriter, fileManager, convertJobOptions);
         const result: ConvertVideoJobResult = await convertJob.execute() as ConvertVideoJobResult;
@@ -490,13 +490,13 @@ describe('ConvertVideoJob', () => {
         assert.isTrue(result.success);
         const fsContents = fileManager.enumerateDirectory("", 0);
         assert.equal(fsContents.length, 1);
-        assert.equal(fsContents[0].fullPath, removedTempTargetFileFullPath)
+        assert.equal(fsContents[0].fullPath, removedTempTargetFileFullPath);
     });
     it('video conversion will be skipped when source video codec name matches skipVideoCodecName parameter', async () => {
         const convertJobOptions: ConvertJobOptions = {
             ...defaultConvertJobOptions,
             skipVideoCodecName: ["mpeg4"],
-        }
+        };
         convertJobOptions.commandOptions.targetFileFullPath = tempTargetFileFullPath;
         const convertJob = JobFactory.makeJob(logger, outputWriter, fileManager, convertJobOptions);
         const result: ConvertVideoJobResult = await convertJob.execute() as ConvertVideoJobResult;
@@ -506,6 +506,26 @@ describe('ConvertVideoJob', () => {
         assert.exists(result.skippedReason);
         const fsContents = fileManager.enumerateDirectory("", 0);
         assert.equal(fsContents.length, 1);
-        assert.equal(fsContents[0].fullPath, removedTempTargetFileFullPath)
+        assert.equal(fsContents[0].fullPath, removedTempTargetFileFullPath);
+    });
+    it('video conversion will be skipped when the target video exists and skipConvertExisting is true', async () => {
+        const convertJobOptions: ConvertJobOptions = {
+            ...defaultConvertJobOptions,
+            skipConvertExisting: true,
+        };
+        fileManager.writeFile(otherTargetFileFullPath, "the target file already exists", false);
+        convertJobOptions.commandOptions.targetFileFullPath = otherTargetFileFullPath;
+        const convertJob = JobFactory.makeJob(logger, outputWriter, fileManager, convertJobOptions);
+        const result: ConvertVideoJobResult = await convertJob.execute() as ConvertVideoJobResult;
+        assert.notExists(result.failureReason);
+        assert.isTrue(result.success);
+        assert.isTrue(result.skipped);
+        assert.exists(result.skippedReason);
+        const fsContents = fileManager.enumerateDirectory("", 0);
+        assert.equal(fsContents.length, 2);
+        const fsSourceFile = fsContents.find(f => f.fullPath === sourceFile.fullPath);
+        assert.exists(fsSourceFile);
+        const fsTargetFile = fsContents.find(f => f.fullPath === otherTargetFileFullPath);
+        assert.exists(fsTargetFile);
     });
 });

@@ -31,7 +31,7 @@ export class JobFactory {
             case "copy":
                 return new CopyJob(logger, outputWriter, fileManager, options as CopyJobOptions);
             case "getinfo":
-                return new GetVideoInfoJob(logger, outputWriter, fileManager, options as GetInfoJobOptions)
+                return new GetVideoInfoJob(logger, outputWriter, fileManager, options as GetInfoJobOptions);
             case "convert":
                 return new ConvertVideoJob(logger, outputWriter, fileManager, options as ConvertJobOptions);
             case "checkvideointegrity":
@@ -117,7 +117,7 @@ export class JobFactory {
                 }
             } as CheckVideoIntegrityJobOptions;
         }
-        const error = new Error(`invalid task type encountered: ${task}`)
+        const error = new Error(`invalid task type encountered: ${task}`);
         logger.LogError("invalid task type provided", error, {
             task,
             fileInfo: sourceFileInfo,
@@ -165,7 +165,7 @@ export class JobFactory {
                 targetFileFullPath = join(absoluteParentPath, `${TEMP_FILE_PREFIX}${targetFileName}`);
             } else {
                 const err = new SourceTargetCollisionError();
-                logger.LogError("cannot proceed source and target path are identical and based on settings that is not allowed...", err, { path: targetFileName })
+                logger.LogError("cannot proceed source and target path are identical and based on settings that is not allowed...", err, { path: targetFileName });
                 throw err;
             }
         }

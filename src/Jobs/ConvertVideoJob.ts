@@ -26,7 +26,7 @@ const FFMPEG_CURRENT_TIME_REGEX = /time=\s*(?<duration>\d{2,}:\d{2}:\d{2}\.?\d*)
 
 export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobResult> {
     constructor(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, options: ConvertJobOptions) {
-        super(logger, outputWriter, fileManager, options)
+        super(logger, outputWriter, fileManager, options);
     }
 
     public validateJobOptions(): boolean {
@@ -132,7 +132,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
                         const totalDuration = this.parseTotalDuration(sourceCheckVideoIntegrityCommandResult.videoInfo);
                         const outputHandler = this.buildConvertOutputHandler(this._logger, this._outputWriter, convertCommandID, numberOfFrames, totalDuration);
                         ffmpegConvertCommand.on(VideoConverterEventName_StdErrMessageReceived, outputHandler);
-                        convertCommandResult = await convertPromise
+                        convertCommandResult = await convertPromise;
                         ffmpegConvertCommand.off(VideoConverterEventName_StdErrMessageReceived, outputHandler);
                         if (convertCommandResult.success !== true) {
                             failureReason = FAILURE_REASON_FAILED_TO_CONVERT_VIDEO;
@@ -175,7 +175,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
                 } else {
                     skippedReason = "skipped because video codec name matched skipVideoCodecName option";
                     this._outputWriter.writeLine(skippedReason);
-                    this._logger.LogWarn(skippedReason, { skipVideoCodecName: this._jobOptions.skipVideoCodecName })
+                    this._logger.LogWarn(skippedReason, { skipVideoCodecName: this._jobOptions.skipVideoCodecName });
                 }
             }
             // write an empty line to advance the progressive update line
@@ -203,7 +203,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
                 }
                 if (targetFileFullPath.indexOf(TEMP_FILE_PREFIX) >= 0) {
                     const newTargetFileFullPath = targetFileFullPath.replace(TEMP_FILE_PREFIX, "");
-                    this._fileManager.renameFile(targetFileFullPath, newTargetFileFullPath)
+                    this._fileManager.renameFile(targetFileFullPath, newTargetFileFullPath);
 
                 }
             }
@@ -252,7 +252,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
         } else if (videoIntegrityCheckCommandResult.integrityCheck.isVideoGood === false) {
             integrityCheckFailureReason = isConvertedFile === true ? FAILURE_REASON_TARGET_FAILED_INTEGRITY_CHECK : FAILURE_REASON_SOURCE_FAILED_INTEGRITY_CHECK;
             this._logger.LogWarn(integrityCheckFailureReason, { videoIntegrityCheckResult: videoIntegrityCheckCommandResult });
-            this._outputWriter.writeLine(`${integrityCheckFailureReason}: see logs for more details`)
+            this._outputWriter.writeLine(`${integrityCheckFailureReason}: see logs for more details`);
             if (isConvertedFile === true && this._jobOptions.keepInvalidConvertResult === false) {
                 const msg = "deleting invalid converted file per keepInvalidConvertResult being set to false";
                 this._logger.LogWarn(msg, {
@@ -288,7 +288,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
     private checkSkipVideoCodecName(videoCodecToSkip: string[], videoInfo?: VideoInfo): boolean {
         const videoStream = videoInfo?.streams.find(s => s.codec_type === "video");
         if (videoStream === undefined) {
-            const msg = "video stream not found for skip video codec check"
+            const msg = "video stream not found for skip video codec check";
             const err = new Error(msg);
             this._logger.LogError("unable to find video stream for file...", err, { videoInfo, videoCodecToSkip });
             this._outputWriter.writeLine(msg);
@@ -355,7 +355,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
                 messageCount++;
             }
             return;
-        }
+        };
     }
 
     private frameCountBasedProgressiveUpdate(logger: ILogger, outputWriter: IOutputWriter, commandID: string, totalNumberOfFrames: number): (args: CommandStdErrMessageReceivedEventData) => void {
@@ -367,7 +367,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
                     logger.LogVerbose("could not find current frame in received message", { message: args.commandMessage });
                     return;
                 }
-                logger.LogVerbose("current frame found", { commandID, currentFrame: currentFrameString, numberOfFrames: totalNumberOfFrames })
+                logger.LogVerbose("current frame found", { commandID, currentFrame: currentFrameString, numberOfFrames: totalNumberOfFrames });
                 if (currentFrameString) {
                     const currentFrameNumber = parseInt(currentFrameString, 10);
                     logger.LogVerbose("current duration parsed", { currentFrameString, currentFrameNumber });
@@ -375,7 +375,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
                     outputWriter.write(`${progressiveUpdate}\r`);
                 }
             }
-        }
+        };
     }
 
     private durationCountBasedProgressiveUpdate(logger: ILogger, outputWriter: IOutputWriter, commandID: string, totalDuration: number): (args: CommandStdErrMessageReceivedEventData) => void {
@@ -387,7 +387,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
                     logger.LogVerbose("could not find current duration in received message", { message: args.commandMessage });
                     return;
                 }
-                logger.LogVerbose("current duration found", { commandID, currentDurationString, totalDuration })
+                logger.LogVerbose("current duration found", { commandID, currentDurationString, totalDuration });
                 if (currentDurationString) {
                     const currentDurationSeconds = HHMMSSmmToSeconds(currentDurationString);
                     logger.LogVerbose("current duration parsed", { currentDurationString, currentDurationSeconds });
@@ -395,14 +395,14 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
                     outputWriter.write(`${progressiveUpdate}\r`);
                 }
             }
-        }
+        };
     }
 
     private makeProgressiveUpdateLine(logger: ILogger, commandID: string, currentValueNumber: number, totalValue: number): string {
         const pctDone = Math.floor(currentValueNumber / totalValue * 100);
         const numMarkers = Math.floor(pctDone / 5);
         logger.LogVerbose("percent done calculated", { commandID, totalValue, currentValueNumber, pctDone, numMarkers });
-        const arrow = `${"=".repeat(numMarkers ?? 0)}>`.padEnd(20, " ")
+        const arrow = `${"=".repeat(numMarkers ?? 0)}>`.padEnd(20, " ");
         const progressiveUpdate = `|${arrow}| %${pctDone}`.padEnd(PROGRESSIVE_UPDATE_CHAR_WIDTH, " ");
         return progressiveUpdate;
     }

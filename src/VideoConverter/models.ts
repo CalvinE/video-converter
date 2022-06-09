@@ -50,22 +50,22 @@ export type VideoEncoder = `${typeof LibX265VideoEncoder | typeof COPY | typeof 
 // FIXME: Having this hard coded is an issue, we should pull encoders from the `ffmpeg -codecs` command?
 export type AudioEncoder = `${typeof COPY | typeof INVALID}`;
 
-export const VideoConverterEventName_Started = "starting"
-export const VideoConverterEventName_Running = "running"
-export const VideoConverterEventName_StdOutMessageReceived = "stdout-message-received"
-export const VideoConverterEventName_StdErrMessageReceived = "stderr-message-received"
-export const VideoConverterEventName_Finished = "finished"
-export const VideoConverterEventName_Errored = "errored"
-export const VideoConverterEventName_Timedout = "timedout"
+export const VideoConverterEventName_Started = "starting";
+export const VideoConverterEventName_Running = "running";
+export const VideoConverterEventName_StdOutMessageReceived = "stdout-message-received";
+export const VideoConverterEventName_StdErrMessageReceived = "stderr-message-received";
+export const VideoConverterEventName_Finished = "finished";
+export const VideoConverterEventName_Errored = "errored";
+export const VideoConverterEventName_Timedout = "timedout";
 
 export type VideoConverterEvent = `${typeof VideoConverterEventName_Started | typeof VideoConverterEventName_Running | typeof VideoConverterEventName_StdOutMessageReceived | typeof VideoConverterEventName_Finished | typeof VideoConverterEventName_Errored | typeof VideoConverterEventName_Timedout}`;
 
-export const CommandStateName_Pending = "pending"
-export const CommandStateName_Started = "started"
-export const CommandStateName_Running = "running"
-export const CommandStateName_Finished = "finished"
-export const CommandStateName_Errored = "error"
-export const CommandStateName_TimedOut = "timeout"
+export const CommandStateName_Pending = "pending";
+export const CommandStateName_Started = "started";
+export const CommandStateName_Running = "running";
+export const CommandStateName_Finished = "finished";
+export const CommandStateName_Errored = "error";
+export const CommandStateName_TimedOut = "timeout";
 
 export type CommandState = `${typeof CommandStateName_Pending | typeof CommandStateName_Started | typeof CommandStateName_Running | typeof CommandStateName_Finished | typeof CommandStateName_Errored | typeof CommandStateName_TimedOut}`
 

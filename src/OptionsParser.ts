@@ -31,14 +31,14 @@ const CONVERT_VIDEO_OPTION_NAME = "convertVideo";
 const CONVERT_VIDEO_TIMEOUT_MILLISECONDS_OPTIONS_NAME = "convertVideoTimeoutMilliseconds";
 const CONVERT_VIDEO_ALLOW_CLOBBER_OPTION_NAME = "convertVideoAllowClobber";
 const CONVERT_VIDEO_SKIP_CONVERT_EXISTING_OPTION_NAME = "convertVideoSkipConvertExisting";
-const CHECK_VIDEO_INTEGRITY_OPTION_NAME = "checkVideoIntegrity"
+const CHECK_VIDEO_INTEGRITY_OPTION_NAME = "checkVideoIntegrity";
 const SAVE_JOB_FILE_ONLY_OPTION_NAME = "saveJobFileOnly";
 const JOB_FILE_PATH_OPTION_NAME = "jobFile";
 // const CONCURRENT_JOBS_OPTION_NAME = "concurrentJobs";
-const DELETE_SOURCE_AFTER_CONVERT_OPTION_NAME = "deleteSourceAfterConvert"
+const DELETE_SOURCE_AFTER_CONVERT_OPTION_NAME = "deleteSourceAfterConvert";
 const KEEP_FAILED_INTEGRITY_CONVERTED_OPTION_NAME = "keepInvalidConvertResult";
 const DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME = "deleteFailedIntegrityCheckFiles";
-const X_ARGS_OPTION_NAME = "xArgs"
+const X_ARGS_OPTION_NAME = "xArgs";
 const FFMPEG_COMMAND_OPTION_NAME = "ffmpegCommand";
 const FFPROBE_COMMAND_OPTION_NAME = "ffprobeCommand";
 const SKIP_IF_VIDEO_CODEC_NAME_MATCH = "skipIfVideoCodecNameMatch";
@@ -109,12 +109,12 @@ export const defaultAppOptions: AppOptions = {
     ffmpegCommand: DEFAULT_FFMPEG_COMMAND,
     ffprobeCommand: DEFAULT_FFPROBE_COMMAND,
     help: false,
-}
+};
 
 function safeQuoteXArg(arg: string): string {
     const sarg = arg?.toString() ?? "";
     if (sarg?.indexOf(" ") >= 0) {
-        return `"${arg}"`
+        return `"${arg}"`;
     }
     return sarg;
 }
@@ -156,26 +156,26 @@ export function ParseOptions(): AppOptions {
                 // eslint-disable-next-line no-case-declarations
                 const copyExtension = argv[++i] ?? "";
                 if (copyExtension.length > 0) {
-                    options[FILES_TO_COPY_EXTENSIONS_OPTION_NAME] = copyExtension.split(",").map((s) => s.toLowerCase())
+                    options[FILES_TO_COPY_EXTENSIONS_OPTION_NAME] = copyExtension.split(",").map((s) => s.toLowerCase());
                 } else {
                     stdout.write(`${FILES_TO_COPY_EXTENSIONS_OPTION_NAME} cannot be empty: ${copyExtension}${EOL}`);
                     return {
                         ...options,
                         help: true
-                    }
+                    };
                 }
                 break;
             case ALLOWED_FILE_EXTENSIONS_OPTION_NAME:
                 // eslint-disable-next-line no-case-declarations
                 const processExtension = argv[++i] ?? "";
                 if (processExtension.length > 0) {
-                    options[ALLOWED_FILE_EXTENSIONS_OPTION_NAME] = processExtension.split(",").map((s) => s.toLowerCase())
+                    options[ALLOWED_FILE_EXTENSIONS_OPTION_NAME] = processExtension.split(",").map((s) => s.toLowerCase());
                 } else {
                     stdout.write(`${ALLOWED_FILE_EXTENSIONS_OPTION_NAME} cannot be empty: ${processExtension}${EOL}`);
                     return {
                         ...options,
                         help: true
-                    }
+                    };
                 }
                 break;
             case TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME:
@@ -194,7 +194,7 @@ export function ParseOptions(): AppOptions {
                     // FIXME: for now all regex provided will be case insensitive...
                     options[FILES_TO_COPY_REGEX_OPTION_NAME] = new RegExp(copyRegexString, "i");
                 } catch (err) {
-                    throw new Error(`${FILES_TO_COPY_REGEX_OPTION_NAME} regex is not valid "${copyRegexString}" : ${err}`)
+                    throw new Error(`${FILES_TO_COPY_REGEX_OPTION_NAME} regex is not valid "${copyRegexString}" : ${err}`);
                 }
                 break;
             case TARGET_FILE_NAME_REGEX_OPTION_NAME:
@@ -204,7 +204,7 @@ export function ParseOptions(): AppOptions {
                     // FIXME: for now all regex provided will be case insensitive...
                     options[TARGET_FILE_NAME_REGEX_OPTION_NAME] = new RegExp(targetRegexString, "i");
                 } catch (err) {
-                    throw new Error(`${TARGET_FILE_NAME_REGEX_OPTION_NAME} regex is not valid "${targetRegexString}" : ${err}`)
+                    throw new Error(`${TARGET_FILE_NAME_REGEX_OPTION_NAME} regex is not valid "${targetRegexString}" : ${err}`);
                 }
                 break;
             case SAVE_PATH_OPTION_NAME:
@@ -398,11 +398,11 @@ export function PrintHelp() {
                 description: "A flag. when present displays help info.",
             },
         ];
-    stdout.write(`video-converter usage:${EOL}`)
-    stdout.write(`video-converter [OPTIONS]${EOL}`)
+    stdout.write(`video-converter usage:${EOL}`);
+    stdout.write(`video-converter [OPTIONS]${EOL}`);
     stdout.write(EOL);
-    stdout.write(`Available options:${EOL}`)
+    stdout.write(`Available options:${EOL}`);
     for (const item of helpData) {
-        stdout.write(`--${item.name} - ${item.description}${EOL}`)
+        stdout.write(`--${item.name} - ${item.description}${EOL}`);
     }
 }
