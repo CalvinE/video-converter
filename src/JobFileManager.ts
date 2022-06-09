@@ -1,6 +1,6 @@
 import { existsSync, lstatSync } from 'fs';
 import { dirname, resolve } from 'path';
-import { IFileManager } from './FileManager';
+import { IFileManager } from './FileManager/FileManager';
 import { ILogger } from './Logger';
 import { bytesToHumanReadableBytes, millisecondsToHHMMSS } from './PrettyPrint';
 import { JobFile, JobOptions } from './VideoConverter/models';
@@ -114,16 +114,16 @@ export class JobFileManager implements IJobFileManager {
                 if (j.state === "completed") {
                     completedCount++;
                     if (j.task === "convert") {
-                        sizeAfterProcessing += j.result?.convertedFileSize ?? j.fileInfo.size;
+                        sizeAfterProcessing += j.result?.convertedFileSize ?? j.sourceFileInfo.size;
                     } else {
-                        sizeAfterProcessing += j.fileInfo.size;
+                        sizeAfterProcessing += j.sourceFileInfo.size;
                     }
                 } else if (j.state === "error") {
                     failedJobIds.push(j.jobID);
                     failedCount++;
-                    sizeAfterProcessing += j.fileInfo.size;
+                    sizeAfterProcessing += j.sourceFileInfo.size;
                 } else {
-                    sizeAfterProcessing += j.fileInfo.size;
+                    sizeAfterProcessing += j.sourceFileInfo.size;
                 }
             }
             this._jobFileData.failedJobIDs = failedJobIds;

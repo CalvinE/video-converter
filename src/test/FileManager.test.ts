@@ -1,7 +1,7 @@
 import { NoopLogger } from './../Logger/NoopLogger';
 import { ILogger } from './../Logger/Logger';
 import { join } from 'path';
-import { FileManager, IFileManager } from '../FileManager';
+import { FileManager, IFileManager } from '../FileManager/FileManager';
 import { assert } from 'chai';
 import { rmSync } from 'fs';
 

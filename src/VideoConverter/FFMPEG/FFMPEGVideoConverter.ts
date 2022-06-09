@@ -1,6 +1,6 @@
 import {
     IFileManager
-} from './../../FileManager';
+} from '../../FileManager/FileManager';
 import {
     CheckVideoIntegrityCommandOptions,
     VideoConvertCommandOptions,
@@ -11,7 +11,7 @@ import {
 } from './../../Logger/Logger';
 import {
     FileInfo
-} from "../../FileManager";
+} from "../../FileManager/FileManager";
 import {
     CommandRunner
 } from "../CommandRunner";

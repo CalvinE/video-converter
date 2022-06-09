@@ -1,5 +1,5 @@
-import { FileInfo, IFileManager } from './../FileManager';
-import { BaseJobOptions, BaseCommandResult, BaseJobResult } from './../VideoConverter/models';
+import { FileInfo, IFileManager } from '../FileManager/FileManager';
+import { BaseJobOptions, BaseCommandResult, BaseJobResult, Task } from './../VideoConverter/models';
 import { IOutputWriter } from './../OutputWriter';
 import { ILogger } from "../Logger";
 
@@ -53,12 +53,12 @@ export abstract class BaseJob<O extends BaseJobOptions, R extends BaseJobResult>
         this._handleJobFailureCleanup();
     }
 
-    public GetJobTaskName(): string {
+    public GetJobTaskName(): Task {
         return this._jobOptions.task;
     }
 
     public GetSourceFileInfo(): FileInfo {
-        return this._jobOptions.fileInfo;
+        return this._jobOptions.sourceFileInfo;
     }
 
 }

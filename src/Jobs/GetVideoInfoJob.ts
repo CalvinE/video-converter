@@ -1,5 +1,5 @@
 import { FFMPEGVideoConverter } from './../VideoConverter/FFMPEG/FFMPEGVideoConverter';
-import { IFileManager } from '../FileManager';
+import { IFileManager } from '../FileManager/FileManager';
 import { ILogger } from '../Logger';
 import { IOutputWriter } from '../OutputWriter/models';
 import { getCommandID, GetInfoJobOptions, GetVideoInfoJobResult } from '../VideoConverter/models';
@@ -26,15 +26,16 @@ export class GetVideoInfoJob extends BaseJob<GetInfoJobOptions, GetVideoInfoJobR
     }
 
     protected async _execute(): Promise<GetVideoInfoJobResult> {
-        this._outputWriter.writeLine(`getting file info: ${this._jobOptions.fileInfo.fullPath}`);
+        this._outputWriter.writeLine(`getting file info: ${this.GetSourceFileInfo().fullPath}`);
         const ffmpegCommand = new FFMPEGVideoConverter(this._logger, this._fileManager, "", this._jobOptions.baseCommand);
-        const commandID = getCommandID(this._jobOptions.task);
-        const details = await ffmpegCommand.getVideoInfo(this._jobOptions.fileInfo, this._jobOptions.jobID, commandID, {
+        const commandID = getCommandID(this.GetJobTaskName());
+        const details = await ffmpegCommand.getVideoInfo(this.GetSourceFileInfo(), this._jobOptions.jobID, commandID, {
             timeoutMilliseconds: this._jobOptions.commandOptions.timeoutMilliseconds,
             xArgs: this._jobOptions.commandOptions.xArgs,
         });
         return {
             success: details.success,
+            skipped: false,
             durationMilliseconds: details.durationMilliseconds,
             durationPretty: details.durationPretty,
             jobID: this._jobOptions.jobID,

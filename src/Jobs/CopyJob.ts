@@ -3,7 +3,7 @@ import { ILogger } from "../Logger";
 import { CopyJobOptions } from "../VideoConverter/models";
 import { BaseJob } from "./BaseJob";
 import { IOutputWriter } from '../OutputWriter';
-import { FileInfo, IFileManager } from '../FileManager';
+import { FileInfo, IFileManager } from '../FileManager/FileManager';
 import { millisecondsToHHMMSS } from '../PrettyPrint';
 
 export const COPY_JOB_NAME = "copy";
@@ -39,7 +39,7 @@ export class CopyJob extends BaseJob<CopyJobOptions, CopyJobResult> {
     protected _execute(): Promise<CopyJobResult> {
         return new Promise((resolve) => {
             const start = Date.now();
-            const sourceFile = this._jobOptions.fileInfo.fullPath;
+            const sourceFile = this.GetSourceFileInfo().fullPath;
             const targetFile = this._jobOptions.targetFileFullPath;
             this._outputWriter.writeLine(`copying file: ${sourceFile} => ${targetFile}`);
             const success = this._fileManager.copyFile(sourceFile, targetFile);
@@ -51,9 +51,10 @@ export class CopyJob extends BaseJob<CopyJobOptions, CopyJobResult> {
             const duration = end - start;
             resolve({
                 jobID: this._jobOptions.jobID,
+                skipped: false,
                 durationMilliseconds: duration,
                 durationPretty: millisecondsToHHMMSS(duration),
-                sourceFileInfo: this._jobOptions.fileInfo,
+                sourceFileInfo: this.GetSourceFileInfo(),
                 success,
                 targetFileInfo,
                 failureReason: undefined, // This will throw an error if it fails?

@@ -1,6 +1,6 @@
 import {
     ILogger
-} from './Logger/Logger';
+} from '../Logger/Logger';
 import {
     basename,
     dirname,
@@ -55,7 +55,7 @@ export interface IFileManager {
      */
     makeDir: (targetDir: string) => boolean
 
-    getFSItemFromPath: (itemPath: string) => FSItem
+    getFSItemFromPath: (itemPath: string, basePath?: string) => FSItem
 
     copyFile: (sourceFileFullPath: string, targetPath: string) => boolean;
 
@@ -67,9 +67,9 @@ export interface IFileManager {
 
     unlinkFile: (targetFileFullPath: string) => boolean;
 
-    renameFile: (oldFilePath: string, newFilePath: string) => void;
+    renameFile: (sourceFileFullPath: string, targetFileFullPath: string) => void;
 
-    safeRenameFile: (oldFilePath: string, newFilePath: string) => boolean;
+    safeRenameFile: (sourceFileFullPath: string, targetFileFullPath: string) => boolean;
 
     exists: (path: string) => boolean;
 
@@ -110,13 +110,14 @@ export class FileManager implements IFileManager {
     constructor(logger: ILogger) {
         this._logger = logger;
     }
-    public renameFile(oldFilePath: string, newFilePath: string): void {
-        renameSync(oldFilePath, newFilePath);
+
+    public renameFile(sourceFileFullPath: string, targetFileFullPath: string): void {
+        renameSync(sourceFileFullPath, targetFileFullPath);
     }
 
-    public safeRenameFile(oldFilePath: string, newFilePath: string): boolean {
+    public safeRenameFile(sourceFileFullPath: string, targetFileFullPath: string): boolean {
         try {
-            this.renameFile(oldFilePath, newFilePath);
+            this.renameFile(sourceFileFullPath, targetFileFullPath);
         } catch (err) {
             return false;
         }
@@ -248,7 +249,7 @@ export class FileManager implements IFileManager {
 
     public getFSItemFromPath(itemPath: string, basePath = "."): FSItem {
         const stats = lstatSync(itemPath);
-        const baseFSInfo = this.getBaseFSInfoFromPath(itemPath, basePath);
+        const baseFSInfo = getBaseFSInfoFromPath(itemPath, basePath);
         if (stats.isDirectory()) {
             return {
                 ...baseFSInfo,
@@ -265,17 +266,17 @@ export class FileManager implements IFileManager {
         }
     }
 
-    private getBaseFSInfoFromPath(itemPath: string, basePath: string): BaseFSItem {
-        const baseFSItem: BaseFSItem = {
-            fullPath: resolve(itemPath),
-            name: basename(itemPath),
-            pathToItem: dirname(itemPath),
-            relativePath: dirname(relative(basePath, itemPath)),
-        }
-        return baseFSItem;
-    }
-
     public joinPath(...pathParts: string[]): string {
         return join(...pathParts);
     }
+}
+
+export function getBaseFSInfoFromPath(itemPath: string, basePath: string): BaseFSItem {
+    const baseFSItem: BaseFSItem = {
+        fullPath: resolve(itemPath),
+        name: basename(itemPath),
+        pathToItem: dirname(itemPath),
+        relativePath: dirname(relative(basePath, itemPath)),
+    }
+    return baseFSItem;
 }

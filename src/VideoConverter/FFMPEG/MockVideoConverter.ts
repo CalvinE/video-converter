@@ -1,4 +1,5 @@
-import { FileInfo } from '../../FileManager';
+import { IFileManager } from './../../FileManager/FileManager';
+import { FileInfo } from '../../FileManager/FileManager';
 import { millisecondsToHHMMSS } from '../../PrettyPrint';
 import { CheckVideoIntegrityCommandOptions, CheckVideoIntegrityCommandResult, ConvertVideoCommandResult, GetVideoInfoCommandOptions, GetVideoInfoCommandResult, IntegrityCheckResult, IVideoConverter, VideoConvertCommandOptions, VideoInfo } from './../models';
 
@@ -6,7 +7,9 @@ import { CheckVideoIntegrityCommandOptions, CheckVideoIntegrityCommandResult, Co
 export class MockVideoConverter implements IVideoConverter {
     private _sourceVideoInfo: VideoInfo;
     private _sourceVideoIntegrityCheck: IntegrityCheckResult;
-    constructor(sourceVideoInfo: VideoInfo, sourceVideoIntegrityCheck: IntegrityCheckResult) {
+    private _fileManager: IFileManager;
+    constructor(fileManager: IFileManager, sourceVideoInfo: VideoInfo, sourceVideoIntegrityCheck: IntegrityCheckResult) {
+        this._fileManager = fileManager;
         this._sourceVideoInfo = sourceVideoInfo;
         this._sourceVideoIntegrityCheck = sourceVideoIntegrityCheck;
     }
@@ -36,6 +39,8 @@ export class MockVideoConverter implements IVideoConverter {
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public convertVideo(_sourceFile: FileInfo, _jobID: string, commandID: string, _options: VideoConvertCommandOptions): Promise<ConvertVideoCommandResult> {
+        // we need to make the target file so that in the test we can see that its there...
+        this._fileManager.writeFile(_options.targetFileFullPath, "mock converted file", false);
         return Promise.resolve({
             commandID,
             durationMilliseconds: 2000,

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { FileInfo } from "../FileManager";
+import { FileInfo } from "../FileManager/FileManager";
 import { AppOptions } from "../OptionsParser";
 
 /**
@@ -75,7 +75,7 @@ export type BaseJobOptions = {
   jobID: string;
   host: string;
   failureReason?: string;
-  fileInfo: FileInfo;
+  sourceFileInfo: FileInfo;
   state: State;
   task: Task;
 }
@@ -86,17 +86,52 @@ export type VideoCommandJobOptions = BaseJobOptions & {
 
 export type ConvertJobOptions = VideoCommandJobOptions & {
   task: "convert";
-  saveInPlace: boolean;
+  /**
+   * When true the source file will be removed after conversion.
+   * This only happens when the source and target file full paths are different (if the target file contains the temp file token the new target file will not be deleted.)
+   */
   deleteSourceAfterConvert: boolean;
+  /**
+   * This is the command invoked to get get video info command. Ex: ffprobe
+   */
   getInfoCommand: string;
+  /**
+   * These are the parameters required for the underlying video convert command.
+   */
   commandOptions: VideoConvertCommandOptions;
+  /**
+   * When true if a converted file fails a integrity check the result will be preserver. I.E: not deleted.
+   */
   keepInvalidConvertResult: boolean;
+  /**
+   * When true this allows the convert job to remove an existing target file if it exists when the job starts.
+   */
   allowClobberExisting: boolean;
+  /**
+   * When true and the target file already exists it will be skipped.
+   */
   skipConvertExisting: boolean;
+  /**
+   * When set if a source video file has the codec_name that matches this value it will be skipped.
+   */
   skipVideoCodecName: string;
-  // This is used for both the source info and target info calls. its mainly to pass the timeout to each for this command...
+  /**
+   * This is used for both the source info and target info calls. Its mainly to pass the timeout to each for this command...
+   */
   checkVideoIntegrityCommandOptions: CheckVideoIntegrityCommandOptions;
   result?: ConvertVideoJobResult;
+  /**
+   * This option exists purely to support testing. it should never be set outside the context of testing!
+   */
+  mockData?: MockVideoConvertJobData
+}
+
+type MockVideoConvertJobData = {
+  useMockVideoConvert: boolean,
+  sourceVideoInfo: VideoInfo,
+  sourceVideoIntegrityCheck: IntegrityCheckResult,
+  targetVideoInfo: VideoInfo,
+  targetVideoIntegrityCheck: IntegrityCheckResult,
 }
 
 export type GetInfoJobOptions = VideoCommandJobOptions & {
@@ -130,6 +165,8 @@ export type BaseJobResult = {
   durationPretty: string;
   success: boolean;
   failureReason?: string;
+  skipped: boolean;
+  skippedReason?: string;
 }
 
 type OmittedConvertVideoCommandResult = Omit<ConvertVideoCommandResult, "targetFileFullPath">;
@@ -142,7 +179,7 @@ export type ConvertVideoJobResult = BaseJobResult & {
   sizeDifference: number;
   sizeDifferencePretty: string;
   sourceFileInfo: FileInfo
-  sourceVideoIntegrityCheck: IntegrityCheckResult;
+  sourceVideoIntegrityCheck?: IntegrityCheckResult;
   sourceVideoInfo?: VideoInfo;
   // Only populated when the command fails (not if the file is not valid, but the command fails)
   sourceCheckVideoIntegrityCommandResult?: OmittedCheckVideoIntegrityCommandResult;
@@ -153,8 +190,6 @@ export type ConvertVideoJobResult = BaseJobResult & {
   targetCheckVideoIntegrityCommandResult?: OmittedCheckVideoIntegrityCommandResult;
   // Only populated when the command fails
   convertCommandResult?: OmittedConvertVideoCommandResult;
-  skipped: boolean;
-  skippedReason?: string;
 }
 
 export type GetVideoInfoJobResult = BaseJobResult & {

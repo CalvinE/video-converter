@@ -1,5 +1,5 @@
 import { ConvertJobOptions } from './../../VideoConverter/models';
-import { FileInfo } from '../../FileManager';
+import { FileInfo } from '../../FileManager/FileManager';
 import { defaultAppOptions } from '../../OptionsParser';
 import { JobFactory, SourceTargetCollisionError, TEMP_FILE_PREFIX } from './../../Jobs/JobFactory';
 import { ILogger } from './../../Logger/Logger';
@@ -14,15 +14,15 @@ describe('JobFactory', () => {
     before(() => {
         logger = new NoopLogger("debug");
         sourceFileInfo = {
-            "fullPath": "X:\\video\\TV_Series\\Alfred Hitchcock Presents\\Alfred Hitchcock Presents Season 1\\Alfred.Hitchcock.Presents.S01E01.DVDRip.XviD-RLe.avi",
-            "name": "Alfred.Hitchcock.Presents.S01E01.DVDRip.XviD-RLe.avi",
+            "fullPath": "X:\\video\\TV_Series\\Alfred Hitchcock Presents\\Alfred Hitchcock Presents Season 1\\Alfred.Hitchcock.Presents.S01E01.avi",
+            "name": "Alfred.Hitchcock.Presents.S01E01.avi",
             "pathToItem": "X:\\video\\TV_Series\\Alfred Hitchcock Presents\\Alfred Hitchcock Presents Season 1",
             "relativePath": "Alfred Hitchcock Presents\\Alfred Hitchcock Presents Season 1",
             "type": "file",
             "size": 183494656,
             "extension": ".avi"
         };
-        tempTargetFileFullPath = `X:\\video\\TV_Series\\Alfred Hitchcock Presents\\Alfred Hitchcock Presents Season 1\\${TEMP_FILE_PREFIX}Alfred.Hitchcock.Presents.S01E01.DVDRip.XviD-RLe.avi`;
+        tempTargetFileFullPath = `X:\\video\\TV_Series\\Alfred Hitchcock Presents\\Alfred Hitchcock Presents Season 1\\${TEMP_FILE_PREFIX}Alfred.Hitchcock.Presents.S01E01.avi`;
     })
     describe('makeJobOptions - convert', () => {
         it('job id should start with convert video identifier', () => {
@@ -31,13 +31,25 @@ describe('JobFactory', () => {
             }) as ConvertJobOptions;
             assert.isTrue(options.jobID.startsWith(CONVERT_VIDEO_JOB_NAME));
         });
+        it('new job options state should be pending', () => {
+            const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
+                ...defaultAppOptions,
+            }) as ConvertJobOptions;
+            assert.equal(options.state, "pending");
+        });
+        it('new job options task should be convert', () => {
+            const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
+                ...defaultAppOptions,
+            }) as ConvertJobOptions;
+            assert.equal(options.task, "convert");
+        });
         it('when container format is specified and different the target file full path should reflect that', () => {
             const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
                 ...defaultAppOptions,
                 savePath: join(__dirname, "output", "video-converter-output"),
                 targetContainerFormat: ".mkv",
             }) as ConvertJobOptions;
-            const expectedTargetFile = join(__dirname, "output", "video-converter-output", "Alfred.Hitchcock.Presents.S01E01.DVDRip.XviD-RLe.mkv");
+            const expectedTargetFile = join(__dirname, "output", "video-converter-output", "Alfred.Hitchcock.Presents.S01E01.mkv");
             assert.equal(options.commandOptions.targetFileFullPath, expectedTargetFile);
         });
         it('throws error when job target file would collide with source file without deleteSourceAfterConvert being true', () => {
@@ -62,8 +74,59 @@ describe('JobFactory', () => {
                 savePath: join(__dirname, "output", "video-converter-output"),
                 copyRelativeFolderPath: true,
             }) as ConvertJobOptions;
-            const expectedTargetFile = join(__dirname, "output", "video-converter-output", "Alfred Hitchcock Presents", "Alfred Hitchcock Presents Season 1", "Alfred.Hitchcock.Presents.S01E01.DVDRip.XviD-RLe.avi");
+            const expectedTargetFile = join(__dirname, "output", "video-converter-output", "Alfred Hitchcock Presents", "Alfred Hitchcock Presents Season 1", "Alfred.Hitchcock.Presents.S01E01.avi");
             assert.equal(options.commandOptions.targetFileFullPath, expectedTargetFile);
         });
-    })
+
+
+        it('when ffprobeCommand is set the baseCommand convert job options will be set appropriately', () => {
+            const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
+                ...defaultAppOptions,
+                ffmpegCommand: "ffmpeg",
+            }) as ConvertJobOptions;
+            assert.equal(options.baseCommand, "ffmpeg")
+        });
+        it('when ffprobeCommand is set the getInfoCommand convert job options will be set appropriately', () => {
+            const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
+                ...defaultAppOptions,
+                ffprobeCommand: "ffprobe",
+            }) as ConvertJobOptions;
+            assert.equal(options.getInfoCommand, "ffprobe")
+        });
+        it('when deleteSourceAfterConvert is set the deleteSourceAfterConvert convert job options will be set appropriately', () => {
+            const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
+                ...defaultAppOptions,
+                deleteSourceAfterConvert: true,
+            }) as ConvertJobOptions;
+            assert.equal(options.deleteSourceAfterConvert, true)
+        });
+        it('when keepInvalidConvertResult is set the keepInvalidConvertResult convert job options will be set appropriately', () => {
+            const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
+                ...defaultAppOptions,
+                keepInvalidConvertResult: true,
+            }) as ConvertJobOptions;
+            assert.equal(options.keepInvalidConvertResult, true)
+        });
+        it('when convertVideoAllowClobber is set the allowClobberExisting convert job options will be set appropriately', () => {
+            const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
+                ...defaultAppOptions,
+                convertVideoAllowClobber: true,
+            }) as ConvertJobOptions;
+            assert.equal(options.allowClobberExisting, true)
+        });
+        it('when convertVideoSkipConvertExisting is set the skipConvertExisting convert job options will be set appropriately', () => {
+            const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
+                ...defaultAppOptions,
+                convertVideoSkipConvertExisting: true,
+            }) as ConvertJobOptions;
+            assert.equal(options.skipConvertExisting, true)
+        });
+        it('when skipIfVideoCodecNameMatch is set the ConvertJobOptions; convert job options will be set appropriately', () => {
+            const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
+                ...defaultAppOptions,
+                skipIfVideoCodecNameMatch: "hevc",
+            }) as ConvertJobOptions;
+            assert.equal(options.skipVideoCodecName, "hevc")
+        });
+    });
 });

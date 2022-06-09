@@ -379,7 +379,7 @@ export function PrintHelp() {
             // },
             {
                 name: DELETE_SOURCE_AFTER_CONVERT_OPTION_NAME,
-                description: "A flag. When present the source file for convert jobs will be deleted after successful conversion.",
+                description: `A flag. When present the source file for convert jobs will be deleted after successful conversion. This is required if ${SAVE_IN_PLACE_OPTION_NAME} is set and the new converted file will end up overwriting the original source file after conversion.`,
             },
             {
                 name: SKIP_IF_VIDEO_CODEC_NAME_MATCH,

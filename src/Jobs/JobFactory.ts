@@ -1,6 +1,6 @@
 import { CheckVideoIntegrityJob, CHECK_VIDEO_INTEGRITY_JOB_NAME } from './CheckVideoIntegrityJob';
 import { CopyJobOptions, GetInfoJobOptions, ConvertJobOptions, CheckVideoIntegrityJobOptions, Task, JobOptions, getJobID, VideoConvertCommandOptions, GetVideoInfoCommandOptions, CheckVideoIntegrityCommandOptions } from './../VideoConverter/models';
-import { FileInfo, IFileManager } from '../FileManager';
+import { FileInfo, IFileManager } from '../FileManager/FileManager';
 import { ILogger } from '../Logger';
 import { IOutputWriter } from '../OutputWriter';
 import { BaseJobOptions } from '../VideoConverter/models';
@@ -41,10 +41,10 @@ export class JobFactory {
         }
     }
 
-    public static makeJobOptions(logger: ILogger, task: Task, fileInfo: FileInfo, appOptions: AppOptions): JobOptions {
-        logger.LogVerbose(`making job of type ${task}`, { fileInfo, appOptions, task });
+    public static makeJobOptions(logger: ILogger, task: Task, sourceFileInfo: FileInfo, appOptions: AppOptions): JobOptions {
+        logger.LogVerbose(`making job of type ${task}`, { sourceFileInfo, appOptions, task });
         if (task === "convert") {
-            const targetFileFullPath = this._getTargetFileFullPath(logger, fileInfo, appOptions).targetFileFullPath;
+            const targetFileFullPath = this._getTargetFileFullPath(logger, sourceFileInfo, appOptions).targetFileFullPath;
             const jobID = getJobID(CONVERT_VIDEO_JOB_NAME);
             const videoConvertOptions: VideoConvertCommandOptions = {
                 useCuda: appOptions.useCuda,
@@ -62,13 +62,13 @@ export class JobFactory {
             return {
                 baseCommand: appOptions.ffmpegCommand,
                 getInfoCommand: appOptions.ffprobeCommand,
-                saveInPlace: appOptions.saveInPlace,
                 deleteSourceAfterConvert: appOptions.deleteSourceAfterConvert,
                 jobID,
                 keepInvalidConvertResult: appOptions.keepInvalidConvertResult,
                 allowClobberExisting: appOptions.convertVideoAllowClobber,
                 skipConvertExisting: appOptions.convertVideoSkipConvertExisting,
-                fileInfo,
+                skipVideoCodecName: appOptions.skipIfVideoCodecNameMatch,
+                sourceFileInfo: sourceFileInfo,
                 host: "local",
                 state: "pending",
                 task: "convert",
@@ -84,18 +84,18 @@ export class JobFactory {
             return {
                 baseCommand: appOptions.ffprobeCommand,
                 jobID,
-                fileInfo,
+                sourceFileInfo: sourceFileInfo,
                 host: "local",
                 state: "pending",
                 task: "getinfo",
                 commandOptions: getVideoInfoOptions,
             } as GetInfoJobOptions;
         } else if (task === "copy") {
-            const targetFileFullPath = this._getTargetFileFullPath(logger, fileInfo, appOptions).targetFileFullPath;
+            const targetFileFullPath = this._getTargetFileFullPath(logger, sourceFileInfo, appOptions).targetFileFullPath;
             const jobID = getJobID(COPY_JOB_NAME);
             return {
                 jobID,
-                fileInfo,
+                sourceFileInfo: sourceFileInfo,
                 host: "local",
                 state: "pending",
                 task: "copy",
@@ -106,7 +106,7 @@ export class JobFactory {
             return {
                 baseCommand: appOptions.ffprobeCommand,
                 jobID,
-                fileInfo,
+                sourceFileInfo: sourceFileInfo,
                 deleteFailedIntegrityCheckFiles: appOptions.deleteFailedIntegrityCheckFiles,
                 host: "local",
                 state: "pending",
@@ -120,7 +120,7 @@ export class JobFactory {
         const error = new Error(`invalid task type encountered: ${task}`)
         logger.LogError("invalid task type provided", error, {
             task,
-            fileInfo,
+            fileInfo: sourceFileInfo,
             options: appOptions,
         });
         throw error;

@@ -1,6 +1,6 @@
 import { WriteStream, createWriteStream } from 'fs';
 import { EOL } from 'os';
-import { IFileManager } from './../FileManager';
+import { IFileManager } from '../FileManager/FileManager';
 import { IOutputWriter } from './models';
 
 export class FileOutputWriter implements IOutputWriter {

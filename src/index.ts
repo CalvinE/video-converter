@@ -31,7 +31,7 @@ import {
     FileManager,
     FSItem,
     FileInfo
-} from './FileManager';
+} from './FileManager/FileManager';
 import {
     FileLogger,
     ILogger
@@ -128,7 +128,7 @@ const metaDataPath = join(".", "output");
             appOutputWriter.writeLine(`enumerating directory: ${appOptions.sourcePath}`);
             const sourcePathContents = await fileManager.enumerateDirectory(appOptions.sourcePath, 10);
             const jobs = getAllJobs(appLogger, subCommand, sourcePathContents, appOptions);
-            const preRunSize = jobs.reduce((a, j) => j.fileInfo.size + a, 0);
+            const preRunSize = jobs.reduce((a, j) => j.sourceFileInfo.size + a, 0);
             const jobFileName = basename(jobFileFullPath);
             const jobName = jobFileName.replace(extname(jobFileName), "");
             jobFileManager = new JobFileManager(appLogger, fileManager, jobFileFullPath, WRITE_PRETTY_JOB_FILE, {
@@ -198,7 +198,7 @@ const metaDataPath = join(".", "output");
                 jobFileManager.updateJob(jobOptions);
             } else if (jobOptions.state === "completed") {
                 // skip the job its already done...
-                appLogger.LogInfo("job is already completed... skipping...", { jobID: jobOptions.jobID, task: jobOptions.task, sourceFile: jobOptions.fileInfo.fullPath });
+                appLogger.LogInfo("job is already completed... skipping...", { jobID: jobOptions.jobID, task: jobOptions.task, sourceFile: jobOptions.sourceFileInfo.fullPath });
                 appLogger.LogVerbose("previously completed job data", { job: jobOptions });
                 appOutputWriter.writeLine(`previously completed job ${jobOptions.jobID}... see logs for details.`);
                 continue;

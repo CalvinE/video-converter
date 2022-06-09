@@ -1,6 +1,6 @@
 import { CheckVideoIntegrityJobOptions, CheckVideoIntegrityJobResult, getCommandID } from '../VideoConverter/models';
 import { FFMPEGVideoConverter } from './../VideoConverter/FFMPEG/FFMPEGVideoConverter';
-import { IFileManager } from '../FileManager';
+import { IFileManager } from '../FileManager/FileManager';
 import { ILogger } from '../Logger';
 import { IOutputWriter } from '../OutputWriter/models';
 import { BaseJob } from './BaseJob';
@@ -28,16 +28,16 @@ export class CheckVideoIntegrityJob extends BaseJob<CheckVideoIntegrityJobOption
     }
 
     protected async _execute(): Promise<CheckVideoIntegrityJobResult> {
-        this._outputWriter.writeLine(`checking video integrity of: ${this._jobOptions.fileInfo.fullPath}`);
+        this._outputWriter.writeLine(`checking video integrity of: ${this.GetSourceFileInfo().fullPath}`);
         const ffmpegCommand = new FFMPEGVideoConverter(this._logger, this._fileManager, "", this._jobOptions.baseCommand);
-        const commandID = getCommandID(this._jobOptions.task);
-        const checkVideoIntegrityCommandResult = await ffmpegCommand.checkVideoIntegrity(this._jobOptions.fileInfo, this._jobOptions.jobID, commandID, {
+        const commandID = getCommandID(this.GetJobTaskName());
+        const checkVideoIntegrityCommandResult = await ffmpegCommand.checkVideoIntegrity(this.GetSourceFileInfo(), this._jobOptions.jobID, commandID, {
             timeoutMilliseconds: this._jobOptions.commandOptions.timeoutMilliseconds,
             xArgs: this._jobOptions.commandOptions.xArgs,
         });
         if (checkVideoIntegrityCommandResult.integrityCheck.isVideoGood === false
             && this._jobOptions.deleteFailedIntegrityCheckFiles === true) {
-            const deleted = this._fileManager.safeUnlinkFile(this._jobOptions.fileInfo.fullPath);
+            const deleted = this._fileManager.safeUnlinkFile(this.GetSourceFileInfo().fullPath);
             if (deleted === true) {
                 const msg = "file deleted because it failed the integrity check";
                 this._logger.LogWarn(msg, { checkVideoIntegrityCommandResult, deleteFailedIntegrityCheckFiles: this._jobOptions.deleteFailedIntegrityCheckFiles });
@@ -54,6 +54,7 @@ export class CheckVideoIntegrityJob extends BaseJob<CheckVideoIntegrityJobOption
             integrityCheck: checkVideoIntegrityCommandResult.integrityCheck,
             jobID: this._jobOptions.jobID,
             success: checkVideoIntegrityCommandResult.success,
+            skipped: false,
             failureReason: checkVideoIntegrityCommandResult.failureReason,
             fileInfo: checkVideoIntegrityCommandResult.fileInfo,
             videoInfo: checkVideoIntegrityCommandResult.videoInfo,
