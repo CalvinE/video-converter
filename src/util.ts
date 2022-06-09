@@ -1,5 +1,5 @@
 export function normalizeString(s: string): string {
-    return s.toLowerCase();
+    return s.toLowerCase().trim();
 }
 
 export function isNullOrUndefined(x: unknown): boolean {

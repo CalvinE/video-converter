@@ -112,9 +112,9 @@ export type ConvertJobOptions = VideoCommandJobOptions & {
    */
   skipConvertExisting: boolean;
   /**
-   * When set if a source video file has the codec_name that matches this value it will be skipped.
+   * An array of lower cased codec names to skip if a source file uses a codec in the array.
    */
-  skipVideoCodecName: string;
+  skipVideoCodecName: string[];
   /**
    * This is used for both the source info and target info calls. Its mainly to pass the timeout to each for this command...
    */

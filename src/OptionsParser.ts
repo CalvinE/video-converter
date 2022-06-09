@@ -74,7 +74,7 @@ export type AppOptions = {
     [X_ARGS_OPTION_NAME]: string[];
     [FFMPEG_COMMAND_OPTION_NAME]: string;
     [FFPROBE_COMMAND_OPTION_NAME]: string;
-    [SKIP_IF_VIDEO_CODEC_NAME_MATCH]: string;
+    [SKIP_IF_VIDEO_CODEC_NAME_MATCH]: string[];
     [OPTIONS_FILE_OPTION_NAME]: string | undefined;
     [HELP_OPTION_NAME]: boolean;
 }
@@ -104,7 +104,7 @@ export const defaultAppOptions: AppOptions = {
     keepInvalidConvertResult: false,
     deleteFailedIntegrityCheckFiles: false,
     xArgs: [],
-    skipIfVideoCodecNameMatch: "",
+    skipIfVideoCodecNameMatch: [],
     optionsFile: undefined,
     ffmpegCommand: DEFAULT_FFMPEG_COMMAND,
     ffprobeCommand: DEFAULT_FFPROBE_COMMAND,
@@ -244,7 +244,7 @@ export function ParseOptions(): AppOptions {
                 options[DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME] = true;
                 break;
             case SKIP_IF_VIDEO_CODEC_NAME_MATCH:
-                options[SKIP_IF_VIDEO_CODEC_NAME_MATCH] = normalizeString(argv[++i]);
+                options[SKIP_IF_VIDEO_CODEC_NAME_MATCH] = argv[++i].split(",").map(s => normalizeString(s));
                 break;
             // case CONCURRENT_JOBS_OPTION_NAME:
             //     // eslint-disable-next-line no-case-declarations
@@ -383,7 +383,7 @@ export function PrintHelp() {
             },
             {
                 name: SKIP_IF_VIDEO_CODEC_NAME_MATCH,
-                description: "Tells the converter to skip a video if its codec name matches this parameter. For example: hevc to skip file already converted to H.265",
+                description: "Tells the converter to skip a video if its codec name lower cased matches a codec in this array. This parameter should be a comma separated list of codecs. All codes are normalized (lower cased and trimmed) For example: hevc,mpeg4",
             },
             {
                 name: OPTIONS_FILE_OPTION_NAME,

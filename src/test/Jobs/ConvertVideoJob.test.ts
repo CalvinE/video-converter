@@ -326,7 +326,7 @@ const defaultConvertJobOptions: ConvertJobOptions = {
     jobID: "text convert job id",
     keepInvalidConvertResult: false,
     skipConvertExisting: false,
-    skipVideoCodecName: "",
+    skipVideoCodecName: [],
     state: "pending",
     mockData: {
         useMockVideoConvert: true,
@@ -495,7 +495,7 @@ describe('ConvertVideoJob', () => {
     it('video conversion will be skipped when source video codec name matches skipVideoCodecName parameter', async () => {
         const convertJobOptions: ConvertJobOptions = {
             ...defaultConvertJobOptions,
-            skipVideoCodecName: "mpeg4",
+            skipVideoCodecName: ["mpeg4"],
         }
         convertJobOptions.commandOptions.targetFileFullPath = tempTargetFileFullPath;
         const convertJob = JobFactory.makeJob(logger, outputWriter, fileManager, convertJobOptions);

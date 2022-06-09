@@ -122,11 +122,12 @@ describe('JobFactory', () => {
             assert.equal(options.skipConvertExisting, true)
         });
         it('when skipIfVideoCodecNameMatch is set the ConvertJobOptions; convert job options will be set appropriately', () => {
+            const codecsToSkip = ["hevc"];
             const options = JobFactory.makeJobOptions(logger, "convert", sourceFileInfo, {
                 ...defaultAppOptions,
-                skipIfVideoCodecNameMatch: "hevc",
+                skipIfVideoCodecNameMatch: codecsToSkip,
             }) as ConvertJobOptions;
-            assert.equal(options.skipVideoCodecName, "hevc")
+            assert.equal(options.skipVideoCodecName, codecsToSkip)
         });
     });
 });

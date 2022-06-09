@@ -285,7 +285,7 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
      * @param videoInfo The info on the video being checked.
      * @param videoCodecToSkip The name of the video codec to skip. For example: hevc
      */
-    private checkSkipVideoCodecName(videoCodecToSkip: string, videoInfo?: VideoInfo): boolean {
+    private checkSkipVideoCodecName(videoCodecToSkip: string[], videoInfo?: VideoInfo): boolean {
         const videoStream = videoInfo?.streams.find(s => s.codec_type === "video");
         if (videoStream === undefined) {
             const msg = "video stream not found for skip video codec check"
@@ -294,10 +294,9 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
             this._outputWriter.writeLine(msg);
             throw err;
         }
-        if (normalizeString(videoStream.codec_name) === normalizeString(videoCodecToSkip)) {
-            return true;
-        }
-        return false;
+        const normalizedVideoStreamCodec = normalizeString(videoStream.codec_name);
+        const skip = videoCodecToSkip.findIndex(c => normalizeString(c) === normalizedVideoStreamCodec) !== -1;
+        return skip;
     }
 
     private makeVideoConverter(isTarget = false): IVideoConverter {
