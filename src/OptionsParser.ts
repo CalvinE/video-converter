@@ -387,6 +387,14 @@ export function PrintHelp() {
             name: DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME,
             description: `A flag. When present in a check integrity job it will delete files that fail the video integrity check. By default they are not deleted.`,
         },
+        {
+            name: RUN_MODE_OPTION_NAME,
+            description: "TODO: Write me...",
+        },
+        {
+            name: METADATA_PATH_OPTION_NAME,
+            description: "A path where job files and log files will be written to if created.",
+        },
         // {
         //     name: CONCURRENT_JOBS_OPTION_NAME,
         //     description: "(NOT IMPLEMENTED YET) A number representing how may jobs the should be processed at one time. Defaults to 1.",
@@ -406,14 +414,6 @@ export function PrintHelp() {
         {
             name: X_ARGS_OPTION_NAME,
             description: "Allows additional info to be passed in to FFMPEG or FFPROBE. Best to use once for each item to append to the command. Also supports a JSON array of strings.",
-        },
-        {
-            name: RUN_MODE_OPTION_NAME,
-            description: "TODO: Write me...",
-        },
-        {
-            name: METADATA_PATH_OPTION_NAME,
-            description: "TODO: Write me...",
         },
         {
             name: HELP_OPTION_NAME,
