@@ -46,8 +46,8 @@ export class FileOutputWriter implements IOutputWriter {
         return new Promise((resolve) => {
             this._fileWriter.close(() => {
                 resolve();
-            })
-        })
+            });
+        });
     }
 
 }

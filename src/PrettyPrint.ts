@@ -24,7 +24,7 @@ export function HHMMSSmmToMilliseconds(HHMMSSmmString: string): number {
     milliseconds += minutesNumber * 60 * 1000;
     const secondsNumber = parseFloat(parts[2]);
     milliseconds += secondsNumber * 1000;
-    return Math.floor(milliseconds)
+    return Math.floor(milliseconds);
 }
 
 export function HHMMSSmmToSeconds(HHMMSSmmString: string): number {
@@ -42,21 +42,21 @@ export function bytesToHumanReadableBytes(bytes: number): string {
     if (Math.abs(bytes) >= trillion) {
         // TerraBytes
         const amount = (bytes / trillion).toFixed(2);
-        return `${amount}TB`
+        return `${amount}TB`;
     } else if (Math.abs(bytes) >= billion) {
         // GigaBytes
         const amount = (bytes / billion).toFixed(2);
-        return `${amount}GB`
+        return `${amount}GB`;
     } else if (Math.abs(bytes) >= million) {
         // MegaBytes
         const amount = (bytes / million).toFixed(2);
-        return `${amount}MB`
+        return `${amount}MB`;
     } else if (Math.abs(bytes) >= thousand) {
         // KiloBytes
         const amount = (bytes / thousand).toFixed(2);
-        return `${amount}KB`
+        return `${amount}KB`;
     } else {
         // Bytes ;-(
-        return `${Math.floor(bytes)}B`
+        return `${Math.floor(bytes)}B`;
     }
 }

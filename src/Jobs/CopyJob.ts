@@ -10,7 +10,7 @@ export const COPY_JOB_NAME = "copy";
 
 export class CopyJob extends BaseJob<CopyJobOptions, CopyJobResult> {
     constructor(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, options: CopyJobOptions) {
-        super(logger, outputWriter, fileManager, options)
+        super(logger, outputWriter, fileManager, options);
     }
 
     public validateJobOptions(): boolean {

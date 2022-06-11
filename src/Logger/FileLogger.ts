@@ -29,7 +29,7 @@ export class FileLogger extends BaseStructuredLogger {
         return new Promise((resolve) => {
             this._writeStream.end(() => {
                 resolve();
-            })
+            });
         });
     }
 

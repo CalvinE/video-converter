@@ -15,14 +15,14 @@ export interface IJobFileManager {
 class ErrorMissingJobFileData extends Error {
     static ErrorName = "MissingJobFileData";
     constructor(jobFilePath: string) {
-        super(`job file does not exist and no initial job data was provided: ${jobFilePath}`)
+        super(`job file does not exist and no initial job data was provided: ${jobFilePath}`);
     }
 }
 
 class ErrorJobFilePathIsNotAFile extends Error {
     static ErrorName = "JobFilePathIsNotAFile";
     constructor(jobFilePath: string) {
-        super(`job file does not point to a file: ${jobFilePath}`)
+        super(`job file does not point to a file: ${jobFilePath}`);
     }
 }
 
@@ -140,12 +140,12 @@ export class JobFileManager implements IJobFileManager {
         this._logger.LogInfo("updating job file data for job", { jobID: job.jobID });
         const jobIndex = this._jobFileData.jobs.findIndex((j) => j.jobID === job.jobID);
         if (jobIndex >= 0) {
-            this._logger.LogVerbose("updating job", { job, jobIndex })
+            this._logger.LogVerbose("updating job", { job, jobIndex });
             this._jobFileData.jobs[jobIndex] = job;
             this.updateJobFileStatistics(job);
-            this._hasUncommittedWrites = true
-            this._logger.LogDebug("job index found for update", { jobIndex })
-            this._logger.LogDebug("setting read and write cache to dirty", { hasUncommittedWrites: this._hasUncommittedWrites, isDirty: this._isDirty })
+            this._hasUncommittedWrites = true;
+            this._logger.LogDebug("job index found for update", { jobIndex });
+            this._logger.LogDebug("setting read and write cache to dirty", { hasUncommittedWrites: this._hasUncommittedWrites, isDirty: this._isDirty });
         } else {
             this._logger.LogWarn("received update for job not in the job file data", { job, jobFileFullPath: this._jobFileFullPath });
         }
@@ -153,23 +153,23 @@ export class JobFileManager implements IJobFileManager {
 
     public writeJobFileData(): void {
         if (this._hasUncommittedWrites === true) {
-            this._logger.LogDebug("writing job file data from file", { jobFileFullPath: this._jobFileFullPath, hasUncommittedWrites: this._hasUncommittedWrites })
+            this._logger.LogDebug("writing job file data from file", { jobFileFullPath: this._jobFileFullPath, hasUncommittedWrites: this._hasUncommittedWrites });
             this._fileManager.writeFile(this._jobFileFullPath, JSON.stringify(this._jobFileData, undefined, this._pretty ? 2 : 0), true);
             // this._isDirty = true;
             this._hasUncommittedWrites = false;
-            this._logger.LogDebug("clearing dirty flag for write cache", { hasUncommittedWrites: this._hasUncommittedWrites })
+            this._logger.LogDebug("clearing dirty flag for write cache", { hasUncommittedWrites: this._hasUncommittedWrites });
         } else {
-            this._logger.LogDebug("there are no uncommitted writes to job file so we will nor write the data to disk...", { hasUncommittedWrites: this._hasUncommittedWrites, isDirty: this._isDirty })
+            this._logger.LogDebug("there are no uncommitted writes to job file so we will nor write the data to disk...", { hasUncommittedWrites: this._hasUncommittedWrites, isDirty: this._isDirty });
         }
     }
 
     public readJobFileData(): JobFile {
         if (this._isDirty === true) {
-            this._logger.LogDebug("reading job file data from file", { jobFileFullPath: this._jobFileFullPath })
-            const rawData = this._fileManager.readFile(this._jobFileFullPath)
+            this._logger.LogDebug("reading job file data from file", { jobFileFullPath: this._jobFileFullPath });
+            const rawData = this._fileManager.readFile(this._jobFileFullPath);
             this._jobFileData = JSON.parse(rawData);
             this._isDirty = false;
-            this._logger.LogDebug("clearing dirty flag for read cache", { isDirty: this._isDirty })
+            this._logger.LogDebug("clearing dirty flag for read cache", { isDirty: this._isDirty });
         } else {
             this._logger.LogDebug("cached data is clean, so returning cache", { isDirty: this._isDirty });
         }

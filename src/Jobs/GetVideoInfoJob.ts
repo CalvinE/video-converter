@@ -9,7 +9,7 @@ export const GET_VIDEO_INFO_JOB_NAME = "getVideoInfo";
 
 export class GetVideoInfoJob extends BaseJob<GetInfoJobOptions, GetVideoInfoJobResult> {
     constructor(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, options: GetInfoJobOptions) {
-        super(logger, outputWriter, fileManager, options)
+        super(logger, outputWriter, fileManager, options);
     }
 
     public validateJobOptions(): boolean {

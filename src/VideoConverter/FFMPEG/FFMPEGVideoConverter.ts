@@ -49,8 +49,8 @@ import {
 
 export class FFMPEGVideoConverter extends CommandRunner implements IVideoConverter {
 
-    private _ffmpegCommand: string
-    private _ffprobeCommand: string
+    private _ffmpegCommand: string;
+    private _ffprobeCommand: string;
     private _fileManager: IFileManager;
 
     constructor(logger: ILogger, fileManager: IFileManager, ffmpegCommand: string, ffprobeCommand: string) {
@@ -91,7 +91,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                     success: ffprobeResult.success,
                 },
             ],
-        }
+        };
     }
 
     protected override emitStarted(data: CommandStartedEventData) {
@@ -151,7 +151,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                     issues,
                 },
                 success: true,
-            }
+            };
         }
         if (sourceFile.size === 0) {
             const durationMilliseconds = Date.now() - start;
@@ -168,7 +168,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                     issues,
                 },
                 success: true,
-            }
+            };
         }
         let videoInfo: VideoInfo | undefined = options.sourceVideoInfoOptions;
 
@@ -195,7 +195,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
                     success: false,
                     commandErrOutput: getVideoInfoResult.commandErrOutput,
                     commandStdOutput: getVideoInfoResult.commandStdOutput,
-                }
+                };
             }
             videoInfo = getVideoInfoResult.videoInfo;
         }
@@ -217,7 +217,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         } else {
             // do other audio checks?
         }
-        const containerFormatInfo = videoInfo.format
+        const containerFormatInfo = videoInfo.format;
         if (containerFormatInfo === undefined) {
             issues.containerInfoMissing = true;
             isVideoGood = false;
@@ -239,7 +239,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
             statusCode: 0,
             failureReason: isVideoGood === true ? undefined : "video file failed integrity check",
             success: true,
-        }
+        };
     }
 
     public async getVideoInfo(sourceFile: FileInfo, jobID: string, commandID: string, options: GetVideoInfoCommandOptions): Promise<GetVideoInfoCommandResult> {
@@ -257,7 +257,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
         const commandResult = await this.executeCommand(this._ffprobeCommand, args, jobID, commandID, options.timeoutMilliseconds);
         const joinedCommandOutput = commandResult.fullOutput.join("");
         const videoInfo: VideoInfo = JSON.parse(joinedCommandOutput);
-        this._logger.LogVerbose("video info retrieved", { videoInfo })
+        this._logger.LogVerbose("video info retrieved", { videoInfo });
         return {
             commandID,
             durationMilliseconds: commandResult.durationMilliseconds,
@@ -273,7 +273,7 @@ export class FFMPEGVideoConverter extends CommandRunner implements IVideoConvert
 
     public async convertVideo(sourceFileInfo: FileInfo, jobID: string, commandID: string, options: VideoConvertCommandOptions): Promise<ConvertVideoCommandResult> {
         this._logger.LogDebug("attempting to convert a video", { sourceFile: sourceFileInfo, options });
-        const targetFilePath: string = dirname(options.targetFileFullPath)
+        const targetFilePath: string = dirname(options.targetFileFullPath);
         this._fileManager.makeDir(targetFilePath);
         let args: string[] = [
             "-hide_banner",

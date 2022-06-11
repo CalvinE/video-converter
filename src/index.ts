@@ -75,9 +75,9 @@ const metaDataPath = join(".", "output");
     let appOptions: AppOptions = ParseOptions();
     // const logger: ILogger = new PrettyJSONConsoleLogger("verbose");
     const appLogger: ILogger = new FileLogger("info", join(metaDataPath, "logs"), true);
-    appLogger.LogDebug("application starting", { appOptions })
+    appLogger.LogDebug("application starting", { appOptions });
     const appOutputWriter: IOutputWriter = new ConsoleOutputWriter();
-    await appOutputWriter.initialize()
+    await appOutputWriter.initialize();
     const fileManager = new FileManager(appLogger);
 
     const jobFileFullPath = resolve(appOptions.jobFile);
@@ -112,7 +112,7 @@ const metaDataPath = join(".", "output");
         } else {
             // we need to make the jobs based on appOptions
             appLogger.LogInfo("writing new job file because job file value does not exist in fs", { jobFile: jobFileFullPath });
-            appOutputWriter.writeLine(`writing job file to ${jobFileFullPath}`)
+            appOutputWriter.writeLine(`writing job file to ${jobFileFullPath}`);
             let subCommand: SubCommand = INVALID;
             if (appOptions.convertVideo === true) {
                 appLogger.LogDebug("convert flag found", {});
@@ -157,7 +157,7 @@ const metaDataPath = join(".", "output");
         }
         const jobFileData = jobFileManager.readJobFileData();
         if (appOptions.saveJobFileOnly === true) {
-            appLogger.LogVerbose("job file data", { jobFileFullPath, jobFileData })
+            appLogger.LogVerbose("job file data", { jobFileFullPath, jobFileData });
             appLogger.LogInfo("exiting because saveJobFile flag is present.", { savedJobFileOnly: appOptions.saveJobFileOnly });
             appOutputWriter.writeLine(`saving job file (${jobFileData.jobs.length} jobs) jobs to ${jobFileFullPath}`);
             return;
@@ -165,9 +165,9 @@ const metaDataPath = join(".", "output");
         // handle Ctrl+C make sure to flush job file.
         process.on("SIGINT", async () => {
             await jobFileManager.shutdownAndFlush();
-            throw new Error("SIGINT received, terminating application...")
+            throw new Error("SIGINT received, terminating application...");
         });
-        appLogger.LogVerbose("processing jobs due to lack of saveJobFileOnly flag", { savedJobFileOnly: appOptions.saveJobFileOnly })
+        appLogger.LogVerbose("processing jobs due to lack of saveJobFileOnly flag", { savedJobFileOnly: appOptions.saveJobFileOnly });
         appLogger.LogVerbose("about to restore app options from job file", { oldAppOptions: appOptions });
         appOptions = jobFileData.options;
         appLogger.LogInfo("restoring app options from job file", { appOptions });
@@ -176,7 +176,7 @@ const metaDataPath = join(".", "output");
         appOutputWriter.writeLine(`found ${jobFileData.jobs?.length} jobs based on parameters`);
         let totalSizeChange = 0;
         const startTimeMilliseconds = Date.now();
-        const numJobs = jobFileData.jobs.length
+        const numJobs = jobFileData.jobs.length;
         let successfulJobs = 0;
         let failedJobs = 0; let i = 0;
         for (const jobOptions of jobFileData.jobs) {
@@ -204,9 +204,9 @@ const metaDataPath = join(".", "output");
                 continue;
             }
             // pending is the only other state?
-            appOutputWriter.writeLine(`running job`)
+            appOutputWriter.writeLine(`running job`);
             appLogger.LogDebug("job options", { job: jobOptions });
-            let success = false
+            let success = false;
             let durationMilliseconds = 0;
             let sizeBytesChange = 0;
             let sourceFile = "";
@@ -227,7 +227,7 @@ const metaDataPath = join(".", "output");
                     jobOptions.result = result as GetVideoInfoJobResult;
                     durationMilliseconds = result.durationMilliseconds;
                     sourceFile = jobOptions.result.fileInfo?.fullPath ?? "";
-                    success = result.success
+                    success = result.success;
                 } else if (jobOptions.task === "copy") {
                     jobOptions.result = result as CopyJobResult;
                     durationMilliseconds = result.durationMilliseconds;
@@ -238,7 +238,7 @@ const metaDataPath = join(".", "output");
                     jobOptions.result = result as CheckVideoIntegrityJobResult;
                     durationMilliseconds = result.durationMilliseconds;
                     sourceFile = jobOptions.result?.fileInfo?.fullPath ?? "";
-                    success = result.success
+                    success = result.success;
                 }
                 else {
                     /// We should not be allowed to get here...
@@ -291,7 +291,7 @@ const metaDataPath = join(".", "output");
         const prettyTotalSizeReduction = bytesToHumanReadableBytes(totalSizeChange);
         const totalJobs = jobFileData.jobs.length;
         appOutputWriter.writeLine("");
-        appLogger.LogInfo("all jobs finished", { prettyDuration, durationMilliseconds, prettyTotalSizeReduction, totalSizeReduction: totalSizeChange, successfulJobs, failedJobs, totalJobs })
+        appLogger.LogInfo("all jobs finished", { prettyDuration, durationMilliseconds, prettyTotalSizeReduction, totalSizeReduction: totalSizeChange, successfulJobs, failedJobs, totalJobs });
         appOutputWriter.writeLine(`All jobs finished`);
         appOutputWriter.writeLine(`Run time: ${prettyDuration}`);
         appOutputWriter.writeLine(`Total Size Reduction: ${prettyTotalSizeReduction}`);
@@ -318,7 +318,7 @@ const metaDataPath = join(".", "output");
                     targetFileNameRegex: fileNameRegex.source,
                     file: item,
                     task,
-                })
+                });
                 return true;
             } else {
                 logger.LogInfo("skipping file because regex did not match name", {
@@ -334,7 +334,7 @@ const metaDataPath = join(".", "output");
                 file: item,
                 task,
             });
-            return true
+            return true;
         }
         return false;
     }
@@ -342,7 +342,7 @@ const metaDataPath = join(".", "output");
 
 
     function getAllJobs(logger: ILogger, subCommand: SubCommand, items: FSItem[], options: AppOptions): JobsOptionsArray {
-        logger.LogDebug("getting all files based on parameters", { targetFileNameRegex: options.targetFileNameRegex?.source, allowedFileExtensions: options.allowedFileExtensions })
+        logger.LogDebug("getting all files based on parameters", { targetFileNameRegex: options.targetFileNameRegex?.source, allowedFileExtensions: options.allowedFileExtensions });
         // TODO: Remember what I was thinking here... Is it that if we are saving in place we should not need to copy anything?
         const allowCopy = !options.saveInPlace;
         const jobOptions: JobsOptionsArray = [];

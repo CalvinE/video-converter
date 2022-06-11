@@ -11,7 +11,7 @@ export const CHECK_VIDEO_INTEGRITY_JOB_NAME = "checkVideoIntegrity";
 
 export class CheckVideoIntegrityJob extends BaseJob<CheckVideoIntegrityJobOptions, CheckVideoIntegrityJobResult> {
     constructor(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, options: CheckVideoIntegrityJobOptions) {
-        super(logger, outputWriter, fileManager, options)
+        super(logger, outputWriter, fileManager, options);
     }
 
     public validateJobOptions(): boolean {
@@ -44,7 +44,7 @@ export class CheckVideoIntegrityJob extends BaseJob<CheckVideoIntegrityJobOption
                 this._outputWriter.writeLine(msg);
             } else {
                 const msg = "invalid file delete failed";
-                this._logger.LogWarn(msg, { checkVideoIntegrityCommandResult, deleteFailedIntegrityCheckFiles: this._jobOptions.deleteFailedIntegrityCheckFiles })
+                this._logger.LogWarn(msg, { checkVideoIntegrityCommandResult, deleteFailedIntegrityCheckFiles: this._jobOptions.deleteFailedIntegrityCheckFiles });
                 this._outputWriter.writeLine(msg);
             }
         }

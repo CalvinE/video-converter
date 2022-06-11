@@ -44,7 +44,7 @@ export type CommandResult = {
 class ErrorCommandTimeOutExceeded extends Error {
     static ErrorName = "CommandTimeOutExceeded";
     constructor(timeoutMilliseconds: number) {
-        super(`command execution exceeded time out ${timeoutMilliseconds}ms`)
+        super(`command execution exceeded time out ${timeoutMilliseconds}ms`);
     }
 }
 
@@ -85,7 +85,7 @@ export abstract class CommandRunner extends EventEmitter {
                 command: command,
                 commandID,
                 args,
-            })
+            });
             const proc = spawn(command, args, {
                 shell: true,
             });
@@ -98,7 +98,7 @@ export abstract class CommandRunner extends EventEmitter {
                 elapsedTimePretty: millisecondsToHHMMSS(this.getElapsedTimeMilliseconds(startTimestampMilliseconds)),
                 pid: proc.pid,
             };
-            this._logger.LogDebug("starting command", eventData)
+            this._logger.LogDebug("starting command", eventData);
             this.emitStarted(eventData);
 
             proc.on('spawn', () => {
@@ -113,7 +113,7 @@ export abstract class CommandRunner extends EventEmitter {
                     elapsedTimePretty: millisecondsToHHMMSS(elapsedTimeMilliseconds),
                     pid: proc.pid,
                 };
-                this._logger.LogDebug("command process spawned", eventData)
+                this._logger.LogDebug("command process spawned", eventData);
                 this.emitRunning(eventData);
             });
 
@@ -132,7 +132,7 @@ export abstract class CommandRunner extends EventEmitter {
                     elapsedTimePretty: millisecondsToHHMMSS(elapsedTimeMilliseconds),
                     pid: proc.pid,
                 };
-                this._logger.LogDebug("message received from command stderr", eventData)
+                this._logger.LogDebug("message received from command stderr", eventData);
                 this.emitStdErrMessageReceived(eventData);
             });
 
@@ -149,7 +149,7 @@ export abstract class CommandRunner extends EventEmitter {
                     elapsedTimePretty: millisecondsToHHMMSS(elapsedTimeMilliseconds),
                     pid: proc.pid,
                 };
-                this._logger.LogDebug("message received from command stdout", eventData)
+                this._logger.LogDebug("message received from command stdout", eventData);
                 this.emitStdOutMessageReceived(eventData);
             });
 
@@ -181,7 +181,7 @@ export abstract class CommandRunner extends EventEmitter {
                     error: err,
                     pid: proc.pid,
                 };
-                this._logger.LogError("command encountered an error", err, eventData)
+                this._logger.LogError("command encountered an error", err, eventData);
                 this.emitErrored(eventData);
                 resolve({
                     commandID,
@@ -296,7 +296,7 @@ export abstract class CommandRunner extends EventEmitter {
                             success: false,
                         });
                     }
-                }, timeoutMilliseconds)
+                }, timeoutMilliseconds);
             }
         });
     }

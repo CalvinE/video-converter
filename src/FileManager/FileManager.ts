@@ -79,28 +79,28 @@ export interface IFileManager {
 class ErrorDirectoryDoesNotExist extends Error {
     static ErrorName = "DirectoryDoesNotExist";
     constructor(directory: string) {
-        super(`directory does not exist: ${directory}`)
+        super(`directory does not exist: ${directory}`);
     }
 }
 
 class ErrorIsNotDirectory extends Error {
     static ErrorName = "IsNotDirectory";
     constructor(item: string) {
-        super(`item exists and is not a directory: ${item}`)
+        super(`item exists and is not a directory: ${item}`);
     }
 }
 
 class ErrorIsNotFile extends Error {
     static ErrorName = "IsNotFile";
     constructor(item: string) {
-        super(`item exists and is not a file: ${item}`)
+        super(`item exists and is not a file: ${item}`);
     }
 }
 
 class ErrorItemDoesNotExist extends Error {
     static ErrorName = "ItemDoesNotExist";
     constructor(item: string) {
-        super(`item does not exist: ${item}`)
+        super(`item does not exist: ${item}`);
     }
 }
 
@@ -201,7 +201,7 @@ export class FileManager implements IFileManager {
             const existingStats = lstatSync(targetDir);
             if (!existingStats.isDirectory()) {
                 const err = new ErrorIsNotDirectory(targetDir);
-                this._logger.LogError("targetDir provided is not a directory...", err, { targetDir })
+                this._logger.LogError("targetDir provided is not a directory...", err, { targetDir });
                 throw err;
             }
             success = true;
@@ -230,10 +230,10 @@ export class FileManager implements IFileManager {
         this._logger.LogDebug("found contents of directory", { directory, numItems: contents.length, maxRecursiveDepth });
         // if recursive loop over stuff and go in directories
         for (const item of contents) {
-            const itemPath: string = join(itemInfo.fullPath, item)
+            const itemPath: string = join(itemInfo.fullPath, item);
             this._logger.LogVerbose("getting info on specific item", { file: item });
             const fsItem = this.getFSItemFromPath(itemPath, originalDirectory ?? directory);
-            this._logger.LogVerbose("file info acquired", { fsItem })
+            this._logger.LogVerbose("file info acquired", { fsItem });
             // This feels weird, but my thought is if you pass -1 or something then go recursive all the way?
             if (maxRecursiveDepth != 0) {
                 if (fsItem.type === 'directory') {
@@ -255,14 +255,14 @@ export class FileManager implements IFileManager {
                 ...baseFSInfo,
                 type: 'directory',
                 files: [],
-            }
+            };
         } else {
             return {
                 ...baseFSInfo,
                 type: 'file',
                 size: stats.size,
                 extension: extname(itemPath).toLowerCase(),
-            }
+            };
         }
     }
 
@@ -277,6 +277,6 @@ export function getBaseFSInfoFromPath(itemPath: string, basePath: string): BaseF
         name: basename(itemPath),
         pathToItem: dirname(itemPath),
         relativePath: dirname(relative(basePath, itemPath)),
-    }
+    };
     return baseFSItem;
 }

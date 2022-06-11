@@ -1,11 +1,11 @@
 import { assert } from "chai";
-import { bytesToHumanReadableBytes, HHMMSSmmToMilliseconds, HHMMSSmmToSeconds, millisecondsToHHMMSS } from "../PrettyPrint"
+import { bytesToHumanReadableBytes, HHMMSSmmToMilliseconds, HHMMSSmmToSeconds, millisecondsToHHMMSS } from "../PrettyPrint";
 
 describe('PrettyPrint', () => {
     describe('millisecondsToHHMMSS', () => {
         it('should take milliseconds totaling multiple days and render properly', () => {
             const result = millisecondsToHHMMSS(280_800_000 + 600_000 + 8_000);
-            assert.equal(result, "78:10:08")
+            assert.equal(result, "78:10:08");
         });
     });
     describe('bytesToHumanReadableBytes', () => {
@@ -32,7 +32,7 @@ describe('PrettyPrint', () => {
         it('should properly label negative bytes', () => {
             const result = bytesToHumanReadableBytes(-1_890);
             assert.equal("-1.89KB", result);
-        })
+        });
     });
     describe('HHMMSSmmToMilliseconds', () => {
         it('should return proper value given properly formatted string', () => {

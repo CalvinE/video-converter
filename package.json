@@ -6,7 +6,8 @@
   "scripts": {
     "test": "mocha --recursive -r ts-node/register --timeout 999999999 --exit ./src/test/**/*.test.ts",
     "build": "tsc",
-    "build:watch": "tsc -w"
+    "build:watch": "tsc -w",
+    "lint": "eslint ./src/"
   },
   "author": "",
   "license": "ISC",

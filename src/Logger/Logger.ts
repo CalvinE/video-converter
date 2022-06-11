@@ -6,7 +6,7 @@ const LogLevelCodes: Record<LogLevel, number> = {
     "info": 1,
     "warn": 2,
     "error": 3,
-}
+};
 
 export abstract class BaseStructuredLogger implements ILogger {
     private _minLogLevel: LogLevel;
@@ -15,7 +15,7 @@ export abstract class BaseStructuredLogger implements ILogger {
     constructor(minLogLevel: LogLevel) {
         this._minLogLevel = minLogLevel;
         // If you pass a bad log level we drop the min so all messages are logged.
-        this._minLogLevelCode = LogLevelCodes[this._minLogLevel] ?? -1
+        this._minLogLevelCode = LogLevelCodes[this._minLogLevel] ?? -1;
     }
 
     private shouldLog(level: LogLevel): boolean {
@@ -64,7 +64,7 @@ export abstract class BaseStructuredLogger implements ILogger {
                 name: err?.name || `${err}`,
                 stack: err.stack,
             },
-        }
+        };
         this.LogMessage("error", message, dataWithErr);
     }
 
