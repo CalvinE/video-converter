@@ -28,7 +28,7 @@ export abstract class BaseJob<O extends BaseJobOptions, R extends BaseJobResult>
     constructor(logger: ILogger, outputWriter: IOutputWriter, fileManager: IFileManager, jobOptions: O) {
         this._logger = logger;
         this._outputWriter = outputWriter;
-        this._fileManager = fileManager
+        this._fileManager = fileManager;
         this._jobOptions = jobOptions;
         this.success = false;
         this.durationMilliseconds = 0;
@@ -59,6 +59,10 @@ export abstract class BaseJob<O extends BaseJobOptions, R extends BaseJobResult>
 
     public GetSourceFileInfo(): FileInfo {
         return this._jobOptions.sourceFileInfo;
+    }
+
+    public GetJobID(): string {
+        return this._jobOptions.jobID;
     }
 
 }

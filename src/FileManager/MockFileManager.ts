@@ -4,7 +4,7 @@ import { FSItem, FileInfo, IFileManager, getBaseFSInfoFromPath } from './FileMan
 /**
  * The idea with this mock file manager initially is to aid in the testing of the ConvertVideoJob.
  * Eventually it may need to be reworked if testing other things becomes a priority...
- * the _contents private member will be an array of FileInfo, we dont care as much about directories...?
+ * the _contents private member will be an array of FileInfo, we don't care as much about directories...?
  */
 export class MockFileManager implements IFileManager {
     private _contents: FileInfo[];
@@ -26,13 +26,15 @@ export class MockFileManager implements IFileManager {
             type: 'file',
             size: Math.floor(Math.random() * 100000),
             extension: extname(itemPath).toLowerCase(),
-        }
+        };
         return fileInfo;
     }
-    copyFile(sourceFileFullPath: string, targetPath: string): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    copyFile(_sourceFileFullPath: string, _targetPath: string): boolean {
         throw new Error("not implements");
     }
-    readFile(sourceFilePath: string): string {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    readFile(_sourceFilePath: string): string {
         throw new Error("not implements");
     }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -43,7 +45,7 @@ export class MockFileManager implements IFileManager {
             type: "file",
             size: content?.length ?? 0,
             extension: extname(targetFileFullPath),
-        }
+        };
         this._contents.push(newFile);
     }
     safeUnlinkFile(targetFileFullPath: string): boolean {
@@ -60,12 +62,12 @@ export class MockFileManager implements IFileManager {
     renameFile(sourceFileFullPath: string, targetFileFullPath: string): void {
         const oldIndex = this._contents.findIndex(f => f.fullPath === sourceFileFullPath);
         if (oldIndex === -1) {
-            throw new Error("source file for rename does not exist.")
+            throw new Error("source file for rename does not exist.");
         }
         const oldFile: FileInfo = {
             ...this._contents[oldIndex],
             ...getBaseFSInfoFromPath(targetFileFullPath, "."),
-        }
+        };
         this._contents.splice(oldIndex, 1);
         const newIndex = this._contents.findIndex(f => f.fullPath === targetFileFullPath);
         if (newIndex === -1) {
@@ -85,10 +87,10 @@ export class MockFileManager implements IFileManager {
         }
     }
     exists(path: string): boolean {
-        const exists = this._contents.findIndex(f => f.fullPath === path)
+        const exists = this._contents.findIndex(f => f.fullPath === path);
         return exists !== -1;
     }
     joinPath(...pathParts: string[]): string {
-        return join(...pathParts)
+        return join(...pathParts);
     }
 }

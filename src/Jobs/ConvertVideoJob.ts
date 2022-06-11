@@ -1,12 +1,12 @@
+import { TEMP_FILE_PREFIX } from './JobFactory';
 import { MockVideoConverter } from './../VideoConverter/FFMPEG/MockVideoConverter';
 import { IVideoConverter } from './../VideoConverter/models';
-import { TEMP_FILE_PREFIX } from './JobFactory';
 import { FileInfo } from '../FileManager/FileManager';
 import { FFMPEGVideoConverter } from './../VideoConverter/FFMPEG/FFMPEGVideoConverter';
 import { IFileManager } from '../FileManager/FileManager';
 import { ILogger } from '../Logger';
 import { IOutputWriter } from '../OutputWriter';
-import { ConvertVideoJobResult, getCommandID, VideoInfo, IntegrityCheckResult, CheckVideoIntegrityCommandResult, ConvertVideoCommandResult, CommandStdErrMessageReceivedEventData, ConvertJobOptions, VideoConverterEventName_StdErrMessageReceived, VideoStreamInfo } from '../VideoConverter/models';
+import { ConvertVideoJobResult, getCommandID, VideoInfo, CheckVideoIntegrityCommandResult, ConvertVideoCommandResult, CommandStdErrMessageReceivedEventData, ConvertJobOptions, VideoConverterEventName_StdErrMessageReceived, VideoStreamInfo } from '../VideoConverter/models';
 import { BaseJob } from "./BaseJob";
 import { bytesToHumanReadableBytes, HHMMSSmmToSeconds, millisecondsToHHMMSS } from '../PrettyPrint';
 import { normalizeString } from '../util';
@@ -60,137 +60,148 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
     // FIXME: I am unhappy with how the nested ifs are structured here...
     protected async _execute(): Promise<ConvertVideoJobResult> {
         const start = Date.now();
-        let sizeBeforeConvert = 0;
-        let sizeAfterConvert = 0;
+        const result = this.getDefaultJobResult(this.GetJobID(), this.GetSourceFileInfo());
+        const sizeBeforeConvert = this.GetSourceFileInfo().size;
+        let convertedFileSize = 0;
         let sizeDifference = 0;
-        let failureReason: string | undefined;
-        let convertCommandResult: ConvertVideoCommandResult | undefined;
-        let targetFileInfo: FileInfo | undefined;
-        let targetVideoInfo: VideoInfo | undefined;
-        let targetVideoIntegrityCheck: IntegrityCheckResult | undefined;
-        let sourceCheckVideoIntegrityCommandResult: CheckVideoIntegrityCommandResult | undefined;
-        let targetCheckVideoIntegrityResult: CheckVideoIntegrityCommandResult | undefined;
-        let skipped = false;
-        let skippedReason: string | undefined;
+        let videoConvertCommandResult: ConvertVideoCommandResult | undefined;
+        let targetCheckVideoIntegrityCommandResult: CheckVideoIntegrityCommandResult | undefined;
         const targetFileFullPath = this._jobOptions.commandOptions.targetFileFullPath;
         const willOverwrite: boolean = this.GetSourceFileInfo().fullPath === targetFileFullPath;
         if (willOverwrite === true) {
-            failureReason = FAILURE_REASON_SOURCE_TARGET_SAME;
-            const err = new Error(`file already exists. Dont want to clobber it: ${this._jobOptions.commandOptions.targetFileFullPath}`);
-            this._logger.LogError(failureReason, err, { targetFileFullPath: this._jobOptions.commandOptions.targetFileFullPath });
+            result.failureReason = FAILURE_REASON_SOURCE_TARGET_SAME;
+            const err = new Error(`file already exists. don't want to clobber it: ${this._jobOptions.commandOptions.targetFileFullPath}`);
+            this._logger.LogError(result.failureReason, err, { targetFileFullPath: this._jobOptions.commandOptions.targetFileFullPath });
+            const durationMilliseconds = Date.now() - start;
+            return {
+                ...result,
+                durationMilliseconds,
+                durationPretty: millisecondsToHHMMSS(durationMilliseconds),
+            };
         }
-        if (failureReason === undefined) {
-            this._logger.LogDebug("getting video file info so that we can calculate progressive updates", {});
-            const sourceIntegrityCheckResult = await this.checkVideoIntegrity(this.GetSourceFileInfo(), "", false);
-            failureReason = sourceIntegrityCheckResult.integrityCheckFailureReason;
-            if (failureReason === undefined) {
-                sourceCheckVideoIntegrityCommandResult = sourceIntegrityCheckResult.videoIntegrityCheckCommandResult;
-                skipped = this.checkSkipVideoCodecName(this._jobOptions.skipVideoCodecName, sourceCheckVideoIntegrityCommandResult.videoInfo);
-                if (!skipped) {
-                    sizeBeforeConvert = this.GetSourceFileInfo().size;
-                    this._outputWriter.writeLine(`converting file: ${this.GetSourceFileInfo().fullPath}`);
-                    this._outputWriter.writeLine(`video encoder => ${this._jobOptions.commandOptions.targetVideoEncoding}`);
-                    this._outputWriter.writeLine(`audio encoder => ${this._jobOptions.commandOptions.targetAudioEncoding}`);
-                    this._outputWriter.writeLine(`container format => ${this._jobOptions.commandOptions.targetContainerFormat}`);
-                    this._outputWriter.writeLine(`target file => ${this._jobOptions.commandOptions.targetFileFullPath}`);
-                    let targetFileExists = this._fileManager.exists(targetFileFullPath);
-                    const clobberExistingFile = targetFileExists && this._jobOptions.allowClobberExisting;
-                    if (clobberExistingFile) {
-                        this._logger.LogWarn("deleting existing converted file because of job options", { allowClobberExisting: this._jobOptions.allowClobberExisting });
-                        this._outputWriter.writeLine("target file exists deleting because of settings provided.");
-                        const deleted = this._fileManager.safeUnlinkFile(targetFileFullPath);
-                        this._logger.LogWarn("attempted file delete complete", { deleted });
-                        if (deleted === true) {
-                            this._logger.LogInfo("file deleted successfully", { targetFileFullPath: targetFileFullPath });
-                            targetFileExists = false;
-                        }
-                        else {
-                            this._logger.LogWarn("existing file failed to delete!", { targetFileFullPath: targetFileFullPath });
-                            this._outputWriter.writeLine("failed to delete existing target file");
-                        }
-                    }
-                    if (targetFileExists) {
-                        if (this._jobOptions.skipConvertExisting !== true) {
-                            const err = new Error(`file already exists. Dont want to clobber it: ${targetFileFullPath}`);
-                            this._logger.LogError(FAILURE_REASON_CANNOT_CLOBBER_EXISTING_FILE, err, { targetFileFullPath: targetFileFullPath });
-                            failureReason = FAILURE_REASON_CANNOT_CLOBBER_EXISTING_FILE;
-                        } else {
-                            const msg = "skipping conversion of file because the target file exists and skipConvertExisting is true";
-                            this._logger.LogWarn(msg, { targetFileFullPath: targetFileFullPath });
-                            this._outputWriter.writeLine(msg);
-                            skipped = true;
-                            skippedReason = msg;
-                        }
-                    } else {
-                        const ffmpegConvertCommand = this.makeVideoConverter(); //new FFMPEGVideoConverter(this._logger, this._fileManager, this._jobOptions.baseCommand, this._jobOptions.getInfoCommand)
-                        const convertCommandID = getCommandID("convert");
-                        const convertPromise = ffmpegConvertCommand.convertVideo(this.GetSourceFileInfo(), this._jobOptions.jobID, convertCommandID, {
-                            ...this._jobOptions.commandOptions,
-                            targetFileFullPath, // here we overwrite this incase we need to save to temp file in case of potential overwrite...
-                        });
-                        const numberOfFrames = this.parseNumberOfFrames(sourceCheckVideoIntegrityCommandResult.videoInfo);
-                        const totalDuration = this.parseTotalDuration(sourceCheckVideoIntegrityCommandResult.videoInfo);
-                        const outputHandler = this.buildConvertOutputHandler(this._logger, this._outputWriter, convertCommandID, numberOfFrames, totalDuration);
-                        ffmpegConvertCommand.on(VideoConverterEventName_StdErrMessageReceived, outputHandler);
-                        convertCommandResult = await convertPromise;
-                        ffmpegConvertCommand.off(VideoConverterEventName_StdErrMessageReceived, outputHandler);
-                        if (convertCommandResult.success !== true) {
-                            failureReason = FAILURE_REASON_FAILED_TO_CONVERT_VIDEO;
-                            this._logger.LogInfo("attempting to delete file from failed job", { targetFileFullPath });
-                            this._fileManager.safeUnlinkFile(targetFileFullPath);
-                        }
-                    }
-                    if (failureReason === undefined) {
-                        const {
-                            integrityCheckFailureReason: targetIntegrityCheckFailureReason,
-                            videoIntegrityCheckCommandResult: targetVideoIntegrityCheckCommandResult,
-                            success: targetVideoIntegrityVCheckSuccessful,
-                        } = await this.checkVideoIntegrity(null, targetFileFullPath, true);
-                        failureReason = targetIntegrityCheckFailureReason;
-                        sizeAfterConvert = targetVideoIntegrityCheckCommandResult.fileInfo.size;
-                        targetCheckVideoIntegrityResult = targetVideoIntegrityCheckCommandResult;
-                        targetFileInfo = targetVideoIntegrityCheckCommandResult.fileInfo;
-                        targetVideoInfo = targetVideoIntegrityCheckCommandResult.videoInfo;
-                        targetVideoIntegrityCheck = targetVideoIntegrityCheckCommandResult.integrityCheck;
-                        if (targetVideoIntegrityVCheckSuccessful === true) {
-                            if (targetCheckVideoIntegrityResult.fileInfo.name.indexOf(TEMP_FILE_PREFIX) >= 0) {
-                                const msg = "file name contains temp token, removing and renaming file";
-                                this._logger.LogInfo(msg, {});
-                                this._outputWriter.writeLine(msg);
-                                // This is a temp file name and the temp part needs to be removed...
-                                const newTargetFileFullPath = targetCheckVideoIntegrityResult.fileInfo.fullPath.replace(TEMP_FILE_PREFIX, "");
-                                // Just a note here... this will overwrite existing file if the name after the temp token is removed is identical to an existing file... Do we want an exists check here, or is that ok?
-                                this._fileManager.renameFile(targetCheckVideoIntegrityResult.fileInfo.fullPath, newTargetFileFullPath);
-                                const {
-                                    integrityCheckFailureReason: targetIntegrityCheckFailureReason,
-                                    videoIntegrityCheckCommandResult: targetVideoIntegrityCheckCommandResult,
-                                } = await this.checkVideoIntegrity(null, newTargetFileFullPath, true);
-                                failureReason = targetIntegrityCheckFailureReason;
-                                targetFileInfo = targetVideoIntegrityCheckCommandResult.fileInfo;
-                                targetVideoInfo = targetVideoIntegrityCheckCommandResult.videoInfo;
-                                targetVideoIntegrityCheck = targetVideoIntegrityCheckCommandResult.integrityCheck;
-                            }
-                        }
-                    }
-                } else {
-                    skippedReason = "skipped because video codec name matched skipVideoCodecName option";
-                    this._outputWriter.writeLine(skippedReason);
-                    this._logger.LogWarn(skippedReason, { skipVideoCodecName: this._jobOptions.skipVideoCodecName });
+        this._logger.LogDebug("getting video file info so that we can calculate progressive updates", {});
+        const sourceIntegrityCheckResult = await this.checkVideoIntegrity(this.GetSourceFileInfo(), "", false);
+        if (sourceIntegrityCheckResult.integrityCheckFailureReason !== undefined) {
+            // logging is handled in this.checkVideoIntegrity
+            result.failureReason = sourceIntegrityCheckResult.integrityCheckFailureReason;
+            const durationMilliseconds = Date.now() - start;
+            return {
+                ...result,
+                durationMilliseconds,
+                durationPretty: millisecondsToHHMMSS(durationMilliseconds),
+            };
+        }
+        const sourceCheckVideoIntegrityCommandResult = sourceIntegrityCheckResult.videoIntegrityCheckCommandResult;
+        result.sourceVideoInfo = sourceCheckVideoIntegrityCommandResult.videoInfo;
+        result.sourceVideoIntegrityCheck = sourceCheckVideoIntegrityCommandResult.integrityCheck;
+        result.skipped = this.checkSkipVideoCodecName(this._jobOptions.skipVideoCodecName, sourceCheckVideoIntegrityCommandResult.videoInfo);
+        if (!result.skipped) {
+            this._outputWriter.writeLine(`converting file: ${this.GetSourceFileInfo().fullPath}`);
+            this._outputWriter.writeLine(`video encoder => ${this._jobOptions.commandOptions.targetVideoEncoding}`);
+            this._outputWriter.writeLine(`audio encoder => ${this._jobOptions.commandOptions.targetAudioEncoding}`);
+            this._outputWriter.writeLine(`container format => ${this._jobOptions.commandOptions.targetContainerFormat}`);
+            this._outputWriter.writeLine(`target file => ${this._jobOptions.commandOptions.targetFileFullPath}`);
+            let targetFileExists = this._fileManager.exists(targetFileFullPath);
+            const clobberExistingFile = targetFileExists && this._jobOptions.allowClobberExisting;
+            if (clobberExistingFile) {
+                this._logger.LogWarn("deleting existing converted file because of job options", { allowClobberExisting: this._jobOptions.allowClobberExisting });
+                this._outputWriter.writeLine("target file exists deleting because of settings provided.");
+                const deleted = this._fileManager.safeUnlinkFile(targetFileFullPath);
+                this._logger.LogWarn("attempted file delete complete", { deleted });
+                if (deleted === true) {
+                    this._logger.LogInfo("file deleted successfully", { targetFileFullPath: targetFileFullPath });
+                    targetFileExists = false;
+                }
+                else {
+                    this._logger.LogWarn("existing file failed to delete!", { targetFileFullPath: targetFileFullPath });
+                    this._outputWriter.writeLine("failed to delete existing target file");
                 }
             }
-            // write an empty line to advance the progressive update line
+            if (targetFileExists) {
+                if (this._jobOptions.skipConvertExisting !== true) {
+                    const err = new Error(`file already exists. don't want to clobber it: ${targetFileFullPath}`);
+                    this._logger.LogError(FAILURE_REASON_CANNOT_CLOBBER_EXISTING_FILE, err, { targetFileFullPath: targetFileFullPath });
+                    result.failureReason = FAILURE_REASON_CANNOT_CLOBBER_EXISTING_FILE;
+                } else {
+                    const msg = "skipping conversion of file because the target file exists and skipConvertExisting is true";
+                    this._logger.LogWarn(msg, { targetFileFullPath: targetFileFullPath });
+                    this._outputWriter.writeLine(msg);
+                    result.skipped = true;
+                    result.skippedReason = msg;
+                }
+            } else {
+                const ffmpegConvertCommand = this.makeVideoConverter(); //new FFMPEGVideoConverter(this._logger, this._fileManager, this._jobOptions.baseCommand, this._jobOptions.getInfoCommand)
+                const convertCommandID = getCommandID("convert");
+                const convertPromise = ffmpegConvertCommand.convertVideo(this.GetSourceFileInfo(), this._jobOptions.jobID, convertCommandID, {
+                    ...this._jobOptions.commandOptions,
+                    targetFileFullPath, // here we overwrite this incase we need to save to temp file in case of potential overwrite...
+                });
+                const numberOfFrames = this.parseNumberOfFrames(sourceCheckVideoIntegrityCommandResult.videoInfo);
+                const totalDuration = this.parseTotalDuration(sourceCheckVideoIntegrityCommandResult.videoInfo);
+                const outputHandler = this.buildConvertOutputHandler(this._logger, this._outputWriter, convertCommandID, numberOfFrames, totalDuration);
+                ffmpegConvertCommand.on(VideoConverterEventName_StdErrMessageReceived, outputHandler);
+                videoConvertCommandResult = await convertPromise;
+                ffmpegConvertCommand.off(VideoConverterEventName_StdErrMessageReceived, outputHandler);
+                if (videoConvertCommandResult.success !== true) {
+                    result.failureReason = FAILURE_REASON_FAILED_TO_CONVERT_VIDEO;
+                    this._logger.LogInfo("attempting to delete file from failed job", { targetFileFullPath });
+                    this._fileManager.safeUnlinkFile(targetFileFullPath);
+                }
+            }
+            if (result.failureReason !== undefined) {
+                const durationMilliseconds = Date.now() - start;
+                return {
+                    ...result,
+                    durationMilliseconds,
+                    durationPretty: millisecondsToHHMMSS(durationMilliseconds),
+                };
+            }
+            const {
+                integrityCheckFailureReason: targetIntegrityCheckFailureReason,
+                videoIntegrityCheckCommandResult: targetVideoIntegrityCheckCommandResult,
+                success: targetVideoIntegrityVCheckSuccessful,
+            } = await this.checkVideoIntegrity(null, targetFileFullPath, true);
+            result.failureReason = targetIntegrityCheckFailureReason;
+            convertedFileSize = targetVideoIntegrityCheckCommandResult.fileInfo.size;
+            targetCheckVideoIntegrityCommandResult = targetVideoIntegrityCheckCommandResult;
+            result.targetFileInfo = targetVideoIntegrityCheckCommandResult.fileInfo;
+            result.targetVideoInfo = targetVideoIntegrityCheckCommandResult.videoInfo;
+            result.targetVideoIntegrityCheck = targetVideoIntegrityCheckCommandResult.integrityCheck;
+            if (targetVideoIntegrityVCheckSuccessful === true) {
+                if (targetCheckVideoIntegrityCommandResult.fileInfo.name.indexOf(TEMP_FILE_PREFIX) >= 0) {
+                    const msg = "file name contains temp token, removing and renaming file";
+                    this._logger.LogInfo(msg, {});
+                    this._outputWriter.writeLine(msg);
+                    // This is a temp file name and the temp part needs to be removed...
+                    const newTargetFileFullPath = targetCheckVideoIntegrityCommandResult.fileInfo.fullPath.replace(TEMP_FILE_PREFIX, "");
+                    // Just a note here... this will overwrite existing file if the name after the temp token is removed is identical to an existing file... Do we want an exists check here, or is that ok?
+                    this._fileManager.renameFile(targetCheckVideoIntegrityCommandResult.fileInfo.fullPath, newTargetFileFullPath);
+                    const {
+                        integrityCheckFailureReason: targetIntegrityCheckFailureReason,
+                        videoIntegrityCheckCommandResult: targetVideoIntegrityCheckCommandResult,
+                    } = await this.checkVideoIntegrity(null, newTargetFileFullPath, true);
+                    result.failureReason = targetIntegrityCheckFailureReason;
+                    result.targetFileInfo = targetVideoIntegrityCheckCommandResult.fileInfo;
+                    result.targetVideoInfo = targetVideoIntegrityCheckCommandResult.videoInfo;
+                    result.targetVideoIntegrityCheck = targetVideoIntegrityCheckCommandResult.integrityCheck;
+                }
+            }
+        } else {
+            result.skippedReason = "skipped because video codec name matched skipVideoCodecName option";
+            this._outputWriter.writeLine(result.skippedReason);
+            this._logger.LogWarn(result.skippedReason, { skipVideoCodecName: this._jobOptions.skipVideoCodecName });
         }
-        this.success = failureReason === undefined;
+        this.success = result.failureReason === undefined;
         // TODO: determine how this is handled if the stuff was skipped per this._jobOptions.skipConvertExisting
         if (this.success === true) {
-            sizeDifference = sizeAfterConvert - sizeBeforeConvert;
+            sizeDifference = convertedFileSize - sizeBeforeConvert;
             // if (willOverwrite === true) {
             //     this._fileManager.unlinkFile(this.GetSourceFileInfo().fullPath);
             //     this._fileManager.renameFile(targetFileFullPath, this.GetSourceFileInfo().fullPath)
             //     // Hmm this is a conundrum... if I unlink the original and place the converted in its place with its name... do I need to recompute the file info and integrity check at this point too?
             //     // TODO: rerun integrity check?
             // } else 
-            if (this._jobOptions.deleteSourceAfterConvert === true && this._jobOptions.sourceFileInfo.fullPath !== targetFileInfo?.fullPath) {
+            if (!result.skipped && this._jobOptions.deleteSourceAfterConvert === true && this._jobOptions.sourceFileInfo.fullPath !== result.targetFileInfo?.fullPath) {
 
                 // delete the source at this point...
                 const deleted = this._fileManager.safeUnlinkFile(this.GetSourceFileInfo().fullPath);
@@ -210,28 +221,36 @@ export class ConvertVideoJob extends BaseJob<ConvertJobOptions, ConvertVideoJobR
         }
         // const sizeDifference = this.success === true ? sizeAfterConvert - sizeBeforeConvert : 0;
         const durationMilliseconds = Date.now() - start;
+        // write an empty line to advance the progressive update line
         this._outputWriter.writeLine("");
         return {
+            ...result,
             jobID: this._jobOptions.jobID,
             success: this.success,
-            skipped,
-            skippedReason,
             sizeDifference,
             sizeDifferencePretty: bytesToHumanReadableBytes(sizeDifference),
-            convertedFileSize: sizeAfterConvert,
-            prettyConvertedFileSize: bytesToHumanReadableBytes(sizeAfterConvert),
+            convertedFileSize,
+            prettyConvertedFileSize: bytesToHumanReadableBytes(convertedFileSize),
             durationMilliseconds,
             durationPretty: millisecondsToHHMMSS(durationMilliseconds),
-            failureReason,
-            sourceFileInfo: this.GetSourceFileInfo(),
-            sourceVideoInfo: sourceCheckVideoIntegrityCommandResult?.videoInfo,
-            sourceVideoIntegrityCheck: sourceCheckVideoIntegrityCommandResult?.integrityCheck,
-            targetFileInfo,
-            targetVideoInfo,
-            targetVideoIntegrityCheck,
             sourceCheckVideoIntegrityCommandResult: sourceCheckVideoIntegrityCommandResult?.success === false ? sourceCheckVideoIntegrityCommandResult : undefined,
-            convertCommandResult: convertCommandResult?.success === false ? convertCommandResult : undefined,
-            targetCheckVideoIntegrityCommandResult: targetCheckVideoIntegrityResult?.success === false ? targetCheckVideoIntegrityResult : undefined,
+            convertCommandResult: videoConvertCommandResult?.success === false ? videoConvertCommandResult : undefined,
+            targetCheckVideoIntegrityCommandResult: targetCheckVideoIntegrityCommandResult?.success === false ? targetCheckVideoIntegrityCommandResult : undefined,
+        };
+    }
+
+    private getDefaultJobResult(jobID: string, sourceFileInfo: FileInfo): ConvertVideoJobResult {
+        return {
+            jobID,
+            convertedFileSize: 0,
+            durationMilliseconds: 0,
+            durationPretty: "",
+            prettyConvertedFileSize: "",
+            sizeDifference: 0,
+            sizeDifferencePretty: "",
+            skipped: false,
+            sourceFileInfo,
+            success: false,
         };
     }
 

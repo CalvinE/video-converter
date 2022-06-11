@@ -528,4 +528,25 @@ describe('ConvertVideoJob', () => {
         const fsTargetFile = fsContents.find(f => f.fullPath === otherTargetFileFullPath);
         assert.exists(fsTargetFile);
     });
+    it('video conversion will be skipped when the target video exists and skipConvertExisting and deleteSourceAfterConvert is true', async () => {
+        const convertJobOptions: ConvertJobOptions = {
+            ...defaultConvertJobOptions,
+            skipConvertExisting: true,
+            deleteSourceAfterConvert: true,
+        };
+        fileManager.writeFile(otherTargetFileFullPath, "the target file already exists", false);
+        convertJobOptions.commandOptions.targetFileFullPath = otherTargetFileFullPath;
+        const convertJob = JobFactory.makeJob(logger, outputWriter, fileManager, convertJobOptions);
+        const result: ConvertVideoJobResult = await convertJob.execute() as ConvertVideoJobResult;
+        assert.notExists(result.failureReason);
+        assert.isTrue(result.success);
+        assert.isTrue(result.skipped);
+        assert.exists(result.skippedReason);
+        const fsContents = fileManager.enumerateDirectory("", 0);
+        assert.equal(fsContents.length, 2);
+        const fsSourceFile = fsContents.find(f => f.fullPath === sourceFile.fullPath);
+        assert.exists(fsSourceFile);
+        const fsTargetFile = fsContents.find(f => f.fullPath === otherTargetFileFullPath);
+        assert.exists(fsTargetFile);
+    });
 });

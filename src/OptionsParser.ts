@@ -283,126 +283,138 @@ export function ParseOptions(): AppOptions {
     };
 }
 
+type ParameterDescription = {
+    name: string;
+    description: string;
+}
+
+function compareParameterDescription(a: ParameterDescription, b: ParameterDescription): number {
+    if (a.name < b.name) {
+        return -1;
+    }
+    if (a.name > b.name) {
+        return 1;
+    }
+    return 0;
+}
+
 export function PrintHelp() {
     // TODO: Write this and make some data in here to keep track of the info for the help data...
-    const helpData: {
-        name: string,
-        description: string,
-    }[] = [
-            {
-                name: SOURCE_PATH_OPTION_NAME,
-                description: "The path that will be searched for files to process.",
-            },
-            {
-                name: FILES_TO_COPY_EXTENSIONS_OPTION_NAME,
-                description: "A comma separated list of file extensions to use when a file should be copied. (Case Insensitive)",
-            },
-            {
-                name: FILES_TO_COPY_REGEX_OPTION_NAME,
-                description: "a regular expression that will be applied to each file in the source path. When a match occurs the file will be copied. (Case Insensitive)",
-            },
-            {
-                name: USE_CUDA_OPTION_NAME,
-                description: "A flag. When provided will add flags to FFMPEG to support hardware accelerated encoders.",
-            },
-            {
-                name: ALLOWED_FILE_EXTENSIONS_OPTION_NAME,
-                description: "A comma separated list of file extensions to use when assessing if a video should be transcoded. (Case Insensitive)",
-            },
-            {
-                name: TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME,
-                description: "The video container format (with or without the preceding .) that the transcoded video will be saved in. If not provided the video container format will not be changed.",
-            },
-            {
-                name: TARGET_AUDIO_ENCODER_PATH_OPTION_NAME,
-                description: "The audio encoder to use for the transcoding. If not provided the audio is copied in the transcoded file.",
-            },
-            {
-                name: TARGET_VIDEO_ENCODER_PATH_OPTION_NAME,
-                description: "The video encoder to use for the transcoding. If not provided the video is copied in the transcoded file.",
-            },
-            {
-                name: TARGET_FILE_NAME_REGEX_OPTION_NAME,
-                description: "a regular expression that will be applied to each file in the source path. When a match occurs the file will be processed. (Case Insensitive)",
-            },
-            {
-                name: SAVE_PATH_OPTION_NAME,
-                description: "Sets where the output will be placed.",
-            },
-            {
-                name: COPY_RELATIVE_FOLDER_PATHS,
-                description: "A flag. When present will duplicate the folder structure after --sourcePath in the --savePath",
-            },
-            {
-                name: SAVE_IN_PLACE_OPTION_NAME,
-                description: "A flag. When present converted video files will be placed in the same directory where the video to be converted is located.",
-            },
-            {
-                name: GET_INFO_OPTION_NAME,
-                description: "A flag. When present will get info about video files based on options provided.",
-            },
-            {
-                name: CONVERT_VIDEO_OPTION_NAME,
-                description: "A flag. When present will convert video files based on options provided.",
-            },
-            {
-                name: CONVERT_VIDEO_ALLOW_CLOBBER_OPTION_NAME,
-                description: `A flag. When present if a video exists in place where one will be created by conversion the existing copy will be deleted before conversion starts. DO NOT USE THIS IF YOU ARE CONVERTING FILES IN PLACE!`,
-            },
-            {
-                name: CONVERT_VIDEO_SKIP_CONVERT_EXISTING_OPTION_NAME,
-                description: "A flag. It is a weird setting that will skip over an existing file that matches the target file for a video convert job.",
-            },
-            {
-                name: CHECK_VIDEO_INTEGRITY_OPTION_NAME,
-                description: "A flag. When present will perform a integrity check of the video files that match other parameters listed.",
-            },
-            {
-                name: SAVE_JOB_FILE_ONLY_OPTION_NAME,
-                description: `A flag. when present the job file will be saved to the value of the ${JOB_FILE_PATH_OPTION_NAME} option, and the program will exit without performing the job.`,
-            },
-            {
-                name: JOB_FILE_PATH_OPTION_NAME,
-                description: `A path to a json job file. if none is provided a default will be generated. If the file provided does not exist it will be created and populated based on the other options provided.`,
-            },
-            {
-                name: KEEP_FAILED_INTEGRITY_CONVERTED_OPTION_NAME,
-                description: `A flag. When present in a convert job it will keep converted files that fail the video integrity check. By default they are deleted.`,
-            },
-            {
-                name: DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME,
-                description: `A flag. When present in a check integrity job it will delete files that fail the video integrity check. By default they are not deleted.`,
-            },
-            // {
-            //     name: CONCURRENT_JOBS_OPTION_NAME,
-            //     description: "(NOT IMPLEMENTED YET) A number representing how may jobs the should be processed at one time. Defaults to 1.",
-            // },
-            {
-                name: DELETE_SOURCE_AFTER_CONVERT_OPTION_NAME,
-                description: `A flag. When present the source file for convert jobs will be deleted after successful conversion. This is required if ${SAVE_IN_PLACE_OPTION_NAME} is set and the new converted file will end up overwriting the original source file after conversion.`,
-            },
-            {
-                name: SKIP_IF_VIDEO_CODEC_NAME_MATCH,
-                description: "Tells the converter to skip a video if its codec name lower cased matches a codec in this array. This parameter should be a comma separated list of codecs. All codes are normalized (lower cased and trimmed) For example: hevc,mpeg4",
-            },
-            {
-                name: OPTIONS_FILE_OPTION_NAME,
-                description: "A path to a JSON file containing options for the video converter. These options are overridden by addition options passed in normally.",
-            },
-            {
-                name: X_ARGS_OPTION_NAME,
-                description: "Allows additional info to be passed in to FFMPEG or FFPROBE. Best to use once for each item to append to the command. Also supports a JSON array of strings.",
-            },
-            {
-                name: HELP_OPTION_NAME,
-                description: "A flag. when present displays help info.",
-            },
-        ];
+    const helpData: ParameterDescription[] = [
+        {
+            name: SOURCE_PATH_OPTION_NAME,
+            description: "The path that will be searched for files to process.",
+        },
+        {
+            name: FILES_TO_COPY_EXTENSIONS_OPTION_NAME,
+            description: "A comma separated list of file extensions to use when a file should be copied. (Case Insensitive)",
+        },
+        {
+            name: FILES_TO_COPY_REGEX_OPTION_NAME,
+            description: "a regular expression that will be applied to each file in the source path. When a match occurs the file will be copied. (Case Insensitive)",
+        },
+        {
+            name: USE_CUDA_OPTION_NAME,
+            description: "A flag. When provided will add flags to FFMPEG to support hardware accelerated encoders.",
+        },
+        {
+            name: ALLOWED_FILE_EXTENSIONS_OPTION_NAME,
+            description: "A comma separated list of file extensions to use when assessing if a video should be transcoded. (Case Insensitive)",
+        },
+        {
+            name: TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME,
+            description: "The video container format (with or without the preceding .) that the transcoded video will be saved in. If not provided the video container format will not be changed.",
+        },
+        {
+            name: TARGET_AUDIO_ENCODER_PATH_OPTION_NAME,
+            description: "The audio encoder to use for the transcoding. If not provided the audio is copied in the transcoded file.",
+        },
+        {
+            name: TARGET_VIDEO_ENCODER_PATH_OPTION_NAME,
+            description: "The video encoder to use for the transcoding. If not provided the video is copied in the transcoded file.",
+        },
+        {
+            name: TARGET_FILE_NAME_REGEX_OPTION_NAME,
+            description: "a regular expression that will be applied to each file in the source path. When a match occurs the file will be processed. (Case Insensitive)",
+        },
+        {
+            name: SAVE_PATH_OPTION_NAME,
+            description: "Sets where the output will be placed.",
+        },
+        {
+            name: COPY_RELATIVE_FOLDER_PATHS,
+            description: "A flag. When present will duplicate the folder structure after --sourcePath in the --savePath",
+        },
+        {
+            name: SAVE_IN_PLACE_OPTION_NAME,
+            description: "A flag. When present converted video files will be placed in the same directory where the video to be converted is located.",
+        },
+        {
+            name: GET_INFO_OPTION_NAME,
+            description: "A flag. When present will get info about video files based on options provided.",
+        },
+        {
+            name: CONVERT_VIDEO_OPTION_NAME,
+            description: "A flag. When present will convert video files based on options provided.",
+        },
+        {
+            name: CONVERT_VIDEO_ALLOW_CLOBBER_OPTION_NAME,
+            description: `A flag. When present if a video exists in place where one will be created by conversion the existing copy will be deleted before conversion starts. DO NOT USE THIS IF YOU ARE CONVERTING FILES IN PLACE!`,
+        },
+        {
+            name: CONVERT_VIDEO_SKIP_CONVERT_EXISTING_OPTION_NAME,
+            description: "A flag. It is a weird setting that will skip over an existing file that matches the target file for a video convert job.",
+        },
+        {
+            name: CHECK_VIDEO_INTEGRITY_OPTION_NAME,
+            description: "A flag. When present will perform a integrity check of the video files that match other parameters listed.",
+        },
+        {
+            name: SAVE_JOB_FILE_ONLY_OPTION_NAME,
+            description: `A flag. when present the job file will be saved to the value of the ${JOB_FILE_PATH_OPTION_NAME} option, and the program will exit without performing the job.`,
+        },
+        {
+            name: JOB_FILE_PATH_OPTION_NAME,
+            description: `A path to a json job file. if none is provided a default will be generated. If the file provided does not exist it will be created and populated based on the other options provided.`,
+        },
+        {
+            name: KEEP_FAILED_INTEGRITY_CONVERTED_OPTION_NAME,
+            description: `A flag. When present in a convert job it will keep converted files that fail the video integrity check. By default they are deleted.`,
+        },
+        {
+            name: DELETE_FAILED_INTEGRITY_CHECK_FILES_OPTION_NAME,
+            description: `A flag. When present in a check integrity job it will delete files that fail the video integrity check. By default they are not deleted.`,
+        },
+        // {
+        //     name: CONCURRENT_JOBS_OPTION_NAME,
+        //     description: "(NOT IMPLEMENTED YET) A number representing how may jobs the should be processed at one time. Defaults to 1.",
+        // },
+        {
+            name: DELETE_SOURCE_AFTER_CONVERT_OPTION_NAME,
+            description: `A flag. When present the source file for convert jobs will be deleted after successful conversion. This is required if ${SAVE_IN_PLACE_OPTION_NAME} is set and the new converted file will end up overwriting the original source file after conversion.`,
+        },
+        {
+            name: SKIP_IF_VIDEO_CODEC_NAME_MATCH,
+            description: "Tells the converter to skip a video if its codec name lower cased matches a codec in this array. This parameter should be a comma separated list of codecs. All codes are normalized (lower cased and trimmed) For example: hevc,mpeg4",
+        },
+        {
+            name: OPTIONS_FILE_OPTION_NAME,
+            description: "A path to a JSON file containing options for the video converter. These options are overridden by addition options passed in normally.",
+        },
+        {
+            name: X_ARGS_OPTION_NAME,
+            description: "Allows additional info to be passed in to FFMPEG or FFPROBE. Best to use once for each item to append to the command. Also supports a JSON array of strings.",
+        },
+        {
+            name: HELP_OPTION_NAME,
+            description: "A flag. when present displays help info.",
+        },
+    ];
     stdout.write(`video-converter usage:${EOL}`);
     stdout.write(`video-converter [OPTIONS]${EOL}`);
     stdout.write(EOL);
     stdout.write(`Available options:${EOL}`);
-    for (const item of helpData) {
-        stdout.write(`--${item.name} - ${item.description}${EOL}`);
+    for (const item of helpData.sort(compareParameterDescription)) {
+        stdout.write(`--${item.name} - ${item.description}${EOL}${EOL}`);
     }
 }
