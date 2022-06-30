@@ -47,14 +47,14 @@ const HELP_OPTION_NAME = "help";
 
 export type AppOptions = {
     [SOURCE_PATH_OPTION_NAME]: string;
-    [FILES_TO_COPY_REGEX_OPTION_NAME]?: RegExp;
+    [FILES_TO_COPY_REGEX_OPTION_NAME]?: string;
     [FILES_TO_COPY_EXTENSIONS_OPTION_NAME]: string[];
     [USE_CUDA_OPTION_NAME]: boolean;
     [ALLOWED_FILE_EXTENSIONS_OPTION_NAME]: string[];
     [TARGET_CONTAINER_FORMAT_PATH_OPTION_NAME]: VideoContainerFormat;
     [TARGET_AUDIO_ENCODER_PATH_OPTION_NAME]: AudioEncoder;
     [TARGET_VIDEO_ENCODER_PATH_OPTION_NAME]: VideoEncoder;
-    [TARGET_FILE_NAME_REGEX_OPTION_NAME]?: RegExp;
+    [TARGET_FILE_NAME_REGEX_OPTION_NAME]?: string;
     [SAVE_PATH_OPTION_NAME]: string;
     [COPY_RELATIVE_FOLDER_PATHS]: boolean;
     [SAVE_IN_PLACE_OPTION_NAME]: boolean;
@@ -120,7 +120,7 @@ function safeQuoteXArg(arg: string): string {
 }
 
 // cmd options are passed with preceding 2 dahses EX: --help
-export function ParseOptions(): AppOptions {
+export function ParseCLIOptions(): AppOptions {
     // Initialize with defaults
     let optionsFileOptions: Partial<AppOptions> = {};
     let optionsFile: string;
@@ -189,23 +189,11 @@ export function ParseOptions(): AppOptions {
                 break;
             case FILES_TO_COPY_REGEX_OPTION_NAME:
                 // eslint-disable-next-line no-case-declarations
-                const copyRegexString = argv[++i];
-                try {
-                    // FIXME: for now all regex provided will be case insensitive...
-                    options[FILES_TO_COPY_REGEX_OPTION_NAME] = new RegExp(copyRegexString, "i");
-                } catch (err) {
-                    throw new Error(`${FILES_TO_COPY_REGEX_OPTION_NAME} regex is not valid "${copyRegexString}" : ${err}`);
-                }
+                options[FILES_TO_COPY_REGEX_OPTION_NAME] = argv[++i];
                 break;
             case TARGET_FILE_NAME_REGEX_OPTION_NAME:
                 // eslint-disable-next-line no-case-declarations
-                const targetRegexString = argv[++i];
-                try {
-                    // FIXME: for now all regex provided will be case insensitive...
-                    options[TARGET_FILE_NAME_REGEX_OPTION_NAME] = new RegExp(targetRegexString, "i");
-                } catch (err) {
-                    throw new Error(`${TARGET_FILE_NAME_REGEX_OPTION_NAME} regex is not valid "${targetRegexString}" : ${err}`);
-                }
+                options[TARGET_FILE_NAME_REGEX_OPTION_NAME] = argv[++i];
                 break;
             case SAVE_PATH_OPTION_NAME:
                 options[SAVE_PATH_OPTION_NAME] = argv[++i];
@@ -278,8 +266,8 @@ export function ParseOptions(): AppOptions {
 
     }
     return {
+        ...options,
         ...optionsFileOptions,
-        ...options
     };
 }
 
@@ -399,7 +387,7 @@ export function PrintHelp() {
         },
         {
             name: OPTIONS_FILE_OPTION_NAME,
-            description: "A path to a JSON file containing options for the video converter. These options are overridden by addition options passed in normally.",
+            description: "A path to a JSON file containing options for the video converter. These options are overridden by addition options passed in normally. THE SETTING IN THE FILE WILL OVERWRITE CLI FLAGS NO MATTER THE ORDER THEY ARE PROVIDED!!!",
         },
         {
             name: X_ARGS_OPTION_NAME,

@@ -41,7 +41,7 @@ import {
 } from './VideoConverter';
 import {
     AppOptions,
-    ParseOptions,
+    ParseCLIOptions,
     PrintHelp
 } from './OptionsParser';
 import {
@@ -72,7 +72,7 @@ const metaDataPath = join(".", "output");
 */
 
 (async function () {
-    let appOptions: AppOptions = ParseOptions();
+    let appOptions: AppOptions = ParseCLIOptions();
     // const logger: ILogger = new PrettyJSONConsoleLogger("verbose");
     const appLogger: ILogger = new FileLogger("info", join(metaDataPath, "logs"), true);
     appLogger.LogDebug("application starting", { appOptions });
@@ -311,22 +311,28 @@ const metaDataPath = join(".", "output");
         await appLogger.shutdown();
     }
 
-    function doesFileMatchCriteria(logger: ILogger, item: FileInfo, task: Task, allowedFileExtensions: string[], fileNameRegex?: RegExp): boolean {
+    function doesFileMatchCriteria(logger: ILogger, item: FileInfo, task: Task, allowedFileExtensions: string[], fileNameRegex?: string): boolean {
         if (fileNameRegex !== undefined) {
-            if (fileNameRegex.test(item.name)) {
-                logger.LogDebug("adding file for processing because it matched the regex", {
-                    targetFileNameRegex: fileNameRegex.source,
-                    file: item,
-                    task,
-                });
-                return true;
-            } else {
-                logger.LogInfo("skipping file because regex did not match name", {
-                    targetFileNameRegex: fileNameRegex,
-                    file: item,
-                    task
-                });
-                return false;
+            try {
+                // FIXME: for now all regex provided will be case insensitive...
+                const regex = new RegExp(fileNameRegex, "i");
+                if (regex.test(item.name)) {
+                    logger.LogDebug("adding file for processing because it matched the regex", {
+                        targetFileNameRegex: regex,
+                        file: item,
+                        task,
+                    });
+                    return true;
+                } else {
+                    logger.LogInfo("skipping file because regex did not match name", {
+                        targetFileNameRegex: fileNameRegex,
+                        file: item,
+                        task
+                    });
+                    return false;
+                }
+            } catch (err) {
+                throw new Error(`file regex is not valid: "${fileNameRegex}" : ${err}`);
             }
         } else if (allowedFileExtensions.indexOf(item.extension) >= 0) {
             logger.LogDebug("file selected because extension matched allowed file extensions", {
@@ -342,7 +348,7 @@ const metaDataPath = join(".", "output");
 
 
     function getAllJobs(logger: ILogger, subCommand: SubCommand, items: FSItem[], options: AppOptions): JobsOptionsArray {
-        logger.LogDebug("getting all files based on parameters", { targetFileNameRegex: options.targetFileNameRegex?.source, allowedFileExtensions: options.allowedFileExtensions });
+        logger.LogDebug("getting all files based on parameters", { targetFileNameRegex: options.targetFileNameRegex, allowedFileExtensions: options.allowedFileExtensions });
         // TODO: Remember what I was thinking here... Is it that if we are saving in place we should not need to copy anything?
         const allowCopy = !options.saveInPlace;
         const jobOptions: JobsOptionsArray = [];
